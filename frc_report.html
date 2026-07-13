@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>รายงานค่าคุณภาพน้ำ — FRC Digital Twin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'IBM Plex Sans Thai','Segoe UI',sans-serif;background:#eef2f7;color:#1e3a5f;font-size:14px}
+header{background:#17497f;color:#fff;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+header h1{font-size:17px;font-weight:600}
+header .sub{font-size:11px;opacity:0.75;margin-top:2px}
+header a{color:#bfdcff;text-decoration:none;font-size:12.5px;border:1px solid rgba(191,220,255,0.4);padding:7px 14px;border-radius:18px}
+.wrap{max-width:1100px;margin:18px auto;padding:0 14px}
+.card{background:#fff;border:1px solid #dbe4ef;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 1px 4px rgba(23,73,127,0.06)}
+label{display:block;font-size:12.5px;color:#3d5a7d;margin:10px 0 5px;font-weight:600}
+label .req{color:#e11d48}
+select,input{width:100%;padding:11px 12px;border:1.5px solid #c3d2e4;border-radius:9px;font-size:14px;font-family:inherit;color:#1e3a5f;background:#fff}
+select:focus,input:focus{outline:none;border-color:#2f6fb2}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.btns{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap}
+button{border:none;border-radius:9px;padding:11px 20px;font-size:13.5px;font-family:inherit;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity .15s}
+button:hover{opacity:0.88}
+.b-search{background:#17497f;color:#fff}
+.b-export{background:#1fa14a;color:#fff}
+.b-print{background:#5b7089;color:#fff}
+.b-clear{background:#e6ecf4;color:#3d5a7d}
+.rep-title{font-size:18px;font-weight:700;color:#17497f;margin-bottom:2px}
+.rep-sub{font-size:14px;color:#3d5a7d;margin-bottom:14px}
+.src-note{font-size:11px;color:#8aa0b8;margin-bottom:10px}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:860px;font-size:13px}
+th,td{border:1px solid #dbe4ef;padding:8px 10px;text-align:center;white-space:nowrap}
+thead th{background:#f2f6fb;color:#17497f;font-weight:700}
+thead .grp{background:#e7eef8}
+tbody tr:nth-child(even){background:#fafcfe}
+tbody td:first-child{text-align:left}
+tr.sum td{background:#fff7e6;font-weight:700}
+td.warn{color:#d97706;font-weight:700}
+td.bad{color:#dc2626;font-weight:700}
+.empty{text-align:center;color:#8aa0b8;padding:34px 0;font-size:14px}
+@media print{header,.filter-card,.btns,.src-note{display:none!important}body{background:#fff}.card{border:none;box-shadow:none;padding:0}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📄 รายงานค่าคุณภาพน้ำ</h1>
+    <div class="sub">FRC DIGITAL TWIN · MWA WATER QUALITY</div>
+  </div>
+  <a href="frc_deckgl.html">🗺️ กลับหน้าแผนที่</a>
+</header>
+
+<div class="wrap">
+  <div class="card filter-card">
+    <div class="grid">
+      <div>
+        <label>ชื่อรายงาน <span class="req">*</span></label>
+        <select id="repType" onchange="onTypeChange()">
+          <option value="daily">ข้อมูลคุณภาพน้ำรายวัน</option>
+          <option value="monthly">ข้อมูลคุณภาพน้ำรายเดือน</option>
+          <option value="yearly">ข้อมูลคุณภาพน้ำรายปี</option>
+          <option value="frcsum">รายงานสรุปผลค่าคลอรีนอิสระคงเหลือ</option>
+        </select>
+      </div>
+      <div>
+        <label>สถานีวัดคุณภาพน้ำ <span class="req">*</span></label>
+        <select id="stSel"></select>
+      </div>
+      <div>
+        <label id="dateLabel">วันที่ <span class="req">*</span></label>
+        <input type="date" id="dateSel">
+      </div>
+    </div>
+    <div class="btns">
+      <button class="b-search" onclick="runReport()">🔍 ค้นหา</button>
+      <button class="b-export" onclick="exportCSV()">📥 Export CSV</button>
+      <button class="b-print" onclick="window.print()">🖨️ พิมพ์</button>
+      <button class="b-clear" onclick="clearAll()">🧹 ล้างเงื่อนไข</button>
+    </div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <div class="rep-title" id="repTitle"></div>
+    <div class="rep-sub" id="repSub"></div>
+    <div class="src-note" id="srcNote"></div>
+    <div class="tbl-wrap"><table id="repTable"></table></div>
+  </div>
+  <div class="card" id="emptyCard"><div class="empty">เลือกเงื่อนไขแล้วกด "ค้นหา" เพื่อแสดงรายงาน</div></div>
+</div>
+
+<script>
+/* ============================================================
+   แหล่งข้อมูล — ตอนนี้ MOCK (deterministic ต่อสถานี+วันที่)
+   จุดเชื่อม API จริง: แก้ฟังก์ชัน fetchReport() ด้านล่าง
+   - intranet: http://172.16.196.100:3000/api/... (ถ้ามี endpoint ย้อนหลัง)
+   - twqonline: เปิดหน้ารายงานบน twqonline → F12 → Network →
+     กดค้นหา → คัดลอก URL ที่ระบบยิง แล้วส่งให้ Claude ต่อให้
+   ============================================================ */
+const DATA_SOURCE = "mock";
+
+const STATIONS = {
+  "9":"สถานีสูบจ่ายน้ำลาดพร้าว","18":"สถานีสูบจ่ายน้ำลุมพินี","17":"สถานีสูบจ่ายน้ำคลองเตย",
+  "14":"สถานีสูบจ่ายน้ำสำโรง","20":"สถานีสูบจ่ายน้ำมีนบุรี","15":"สถานีสูบจ่ายน้ำลาดกระบัง",
+  "19":"สถานีสูบจ่ายน้ำบางพลี","5":"สถานีสูบจ่ายน้ำราษฎร์บูรณะ","4":"สถานีสูบจ่ายน้ำเพชรเกษม",
+  "16":"สถานีสูบจ่ายน้ำท่าพระ",
+  "TR1":"สถานีสูบส่งน้ำบางเขน 1 (TR1)","TR2":"สถานีสูบส่งน้ำบางเขน 2 (TR2)",
+  "TR3":"สถานีสูบส่งน้ำบางเขน 3 (TR3)","MTR":"สถานีสูบส่งน้ำมหาสวัสดิ์ (MTR)"
+};
+
+const sel = document.getElementById("stSel");
+Object.keys(STATIONS).forEach(function(id){
+  var o=document.createElement("option");o.value=id;o.textContent=STATIONS[id];sel.appendChild(o);
+});
+document.getElementById("dateSel").valueAsDate = new Date();
+
+// ---------- mock generator (สุ่มแบบ deterministic เพื่อ demo) ----------
+function seedRand(str){
+  var h=2166136261;
+  for(var i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}
+  return function(){h=Math.imul(h^(h>>>15),2246822519);h=Math.imul(h^(h>>>13),3266489917);return ((h^=h>>>16)>>>0)/4294967296;};
+}
+function mockRow(key,base){
+  var r=seedRand(key);
+  function trio(b,noise,dec){
+    var avg=b+(r()-0.5)*noise;
+    var hi=avg+r()*noise*0.7, lo=avg-r()*noise*0.7;
+    return [hi,lo,avg].map(function(v){return Math.max(0,v).toFixed(dec);});
+  }
+  return {frcin:trio(base.frcin,0.14,2),frc:trio(base.frc,0.14,2),turb:trio(base.turb,0.12,2),ph:trio(base.ph,0.14,2),temp:trio(base.temp,0.9,1)};
+}
+const BASE={frcin:1.18,frc:1.02,turb:0.32,ph:7.4,temp:29.5};
+const NO_INLET=["18","TR1","TR2","TR3","MTR"]; // สถานีไม่มี sensor ขาเข้า
+
+// ---------- จุดเชื่อม API จริง ----------
+async function fetchReport(type, stId, dateStr){
+  if(DATA_SOURCE==="mock"){
+    var rows=[];
+    if(type==="daily"){
+      for(var h=0;h<24;h++){
+        var hh=String(h).padStart(2,"0")+":00";
+        rows.push(Object.assign({label:thDate(dateStr)+" "+hh}, mockRow(stId+dateStr+h,BASE)));
+      }
+    }else if(type==="monthly"){
+      var d=new Date(dateStr), y=d.getFullYear(), m=d.getMonth();
+      var days=new Date(y,m+1,0).getDate();
+      for(var dd=1;dd<=days;dd++){
+        var ds=y+"-"+String(m+1).padStart(2,"0")+"-"+String(dd).padStart(2,"0");
+        rows.push(Object.assign({label:thDate(ds)}, mockRow(stId+ds,BASE)));
+      }
+    }else{
+      var yy=new Date(dateStr).getFullYear();
+      var mn=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+      for(var mm=0;mm<12;mm++){
+        rows.push(Object.assign({label:mn[mm]+" "+(yy+543)}, mockRow(stId+yy+"m"+mm,BASE)));
+      }
+    }
+    if(NO_INLET.indexOf(stId)>=0)rows.forEach(function(r){r.frcin=["-","-","-"];});
+    return rows;
+  }
+  // ---- ตัวอย่างโครงเมื่อได้ endpoint จริง ----
+  // const r = await fetch(REPORT_API+"?station="+stId+"&date="+dateStr+"&type="+type);
+  // const j = await r.json();
+  // return j.rows.map(x=>({label:x.datetime, frc:[x.frcMax,x.frcMin,x.frcAvg], ...}));
+  throw new Error("ยังไม่ได้ตั้งค่า endpoint");
+}
+
+function thDate(iso){
+  var p=iso.split("-");
+  return p[2]+"/"+p[1]+"/"+(parseInt(p[0])+543);
+}
+function frcClass(v){v=parseFloat(v);return v<0.5?"bad":(v<0.8?"warn":"");}
+
+let lastRows=null,lastMeta=null;
+
+async function runReport(){
+  var type=document.getElementById("repType").value;
+  var stId=document.getElementById("stSel").value;
+  var dateStr=document.getElementById("dateSel").value;
+  if(!dateStr){alert("กรุณาเลือกวันที่");return;}
+  var rows=await fetchReport(type==="frcsum"?"daily":type, stId, dateStr);
+  lastRows=rows;
+  var typeName={daily:"รายงานคุณภาพน้ำรายวัน",monthly:"รายงานคุณภาพน้ำรายเดือน",yearly:"รายงานคุณภาพน้ำรายปี",frcsum:"รายงานสรุปผลค่าคลอรีนอิสระคงเหลือ"}[type];
+  var when={daily:"วันที่ "+thDate(dateStr),monthly:"เดือน "+thDate(dateStr).slice(3),yearly:"ปี "+(new Date(dateStr).getFullYear()+543),frcsum:"วันที่ "+thDate(dateStr)}[type];
+  lastMeta={typeName:typeName,when:when,station:STATIONS[stId]};
+  document.getElementById("repTitle").textContent=typeName+" "+when;
+  document.getElementById("repSub").textContent=STATIONS[stId];
+  document.getElementById("srcNote").textContent=DATA_SOURCE==="mock"?"⚠️ ข้อมูลตัวอย่าง (demo) — รอเชื่อม endpoint รายงานจริง":"ข้อมูลจริงจากระบบ";
+  var onlyFrc=(type==="frcsum");
+  var t=document.getElementById("repTable");
+  var head='<thead><tr><th rowspan="2">วันที่</th><th colspan="3" class="grp">คลอรีนอิสระคงเหลือขาเข้า (mg/L)</th><th colspan="3" class="grp">คลอรีนอิสระคงเหลือขาออก (mg/L)</th>'
+    +(onlyFrc?'':'<th colspan="3" class="grp">ความขุ่น (NTU)</th><th colspan="3" class="grp">pH</th><th colspan="3" class="grp">อุณหภูมิ (°C)</th>')
+    +'</tr><tr>'+('<th>สูงสุด</th><th>ต่ำสุด</th><th>ค่าเฉลี่ย</th>').repeat(onlyFrc?2:5)+'</tr></thead>';
+  var body='<tbody>';
+  var agg={frcin:[[],[],[]],frc:[[],[],[]],turb:[[],[],[]],ph:[[],[],[]],temp:[[],[],[]]};
+  rows.forEach(function(r){
+    ["frcin","frc","turb","ph","temp"].forEach(function(k){r[k].forEach(function(v,i){var f=parseFloat(v);if(!isNaN(f))agg[k][i].push(f);});});
+    body+='<tr><td>'+r.label+'</td>'
+      +r.frcin.map(function(v){return '<td class="'+frcClass(v)+'">'+v+'</td>';}).join('')
+      +r.frc.map(function(v){return '<td class="'+frcClass(v)+'">'+v+'</td>';}).join('')
+      +(onlyFrc?'':r.turb.map(v=>'<td>'+v+'</td>').join('')+r.ph.map(v=>'<td>'+v+'</td>').join('')+r.temp.map(v=>'<td>'+v+'</td>').join(''))
+      +'</tr>';
+  });
+  function s(a,f){return a.length?f(a).toFixed(2):"-";}
+  function trioSum(k){return '<td>'+s(agg[k][0],a=>Math.max.apply(null,a))+'</td><td>'+s(agg[k][1],a=>Math.min.apply(null,a))+'</td><td>'+s(agg[k][2],a=>a.reduce((x,y)=>x+y,0)/a.length)+'</td>';}
+  var sumCells=trioSum("frcin")+trioSum("frc");
+  if(!onlyFrc){["turb","ph","temp"].forEach(function(k){sumCells+=trioSum(k);});}
+  body+='<tr class="sum"><td>สรุปทั้งช่วง</td>'+sumCells+'</tr></tbody>';
+  t.innerHTML=head+body;
+  document.getElementById("resultCard").style.display="block";
+  document.getElementById("emptyCard").style.display="none";
+}
+
+function exportCSV(){
+  if(!lastRows){alert("กดค้นหาก่อนครับ");return;}
+  var lines=[lastMeta.typeName+" "+lastMeta.when, lastMeta.station,
+    "วันที่,FRC ขาเข้า สูงสุด,FRC ขาเข้า ต่ำสุด,FRC ขาเข้า เฉลี่ย,FRC ขาออก สูงสุด,FRC ขาออก ต่ำสุด,FRC ขาออก เฉลี่ย,ความขุ่น สูงสุด,ความขุ่น ต่ำสุด,ความขุ่น เฉลี่ย,pH สูงสุด,pH ต่ำสุด,pH เฉลี่ย,อุณหภูมิ สูงสุด,อุณหภูมิ ต่ำสุด,อุณหภูมิ เฉลี่ย"];
+  lastRows.forEach(function(r){lines.push([r.label].concat(r.frcin,r.frc,r.turb,r.ph,r.temp).join(","));});
+  var blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="report_"+document.getElementById("stSel").value+"_"+document.getElementById("dateSel").value+".csv";
+  a.click();
+}
+
+function onTypeChange(){
+  var t=document.getElementById("repType").value;
+  document.getElementById("dateLabel").innerHTML=(t==="yearly"?"ปี":"วันที่")+' <span class="req">*</span>';
+}
+function clearAll(){
+  document.getElementById("repType").selectedIndex=0;
+  document.getElementById("stSel").selectedIndex=0;
+  document.getElementById("dateSel").valueAsDate=new Date();
+  document.getElementById("resultCard").style.display="none";
+  document.getElementById("emptyCard").style.display="block";
+  lastRows=null;
+}
+</script>
+</body>
+</html>
