@@ -78,6 +78,7 @@ td.bad{color:#dc2626;font-weight:700}
       <button class="b-export" onclick="exportCSV()">📥 Export CSV</button>
       <button class="b-print" onclick="window.print()">🖨️ พิมพ์</button>
       <button class="b-clear" onclick="clearAll()">🧹 ล้างเงื่อนไข</button>
+      <button class="b-clear" onclick="setToken()" id="tokBtn">🔑 เชื่อมข้อมูลจริง</button>
     </div>
   </div>
 
@@ -98,7 +99,44 @@ td.bad{color:#dc2626;font-weight:700}
    - twqonline: เปิดหน้ารายงานบน twqonline → F12 → Network →
      กดค้นหา → คัดลอก URL ที่ระบบยิง แล้วส่งให้ Claude ต่อให้
    ============================================================ */
-const DATA_SOURCE = "mock";
+const DATA_SOURCE = "mock"; // เปลี่ยนเป็น "twq" เมื่อได้ mapping response ครบ
+
+/* ===== โครงเชื่อม endpoint รายงานจริง (twqonline) — เตรียมพร้อมแล้ว =====
+   POST https://twqonline.mwa.co.th/TWQMSServiceadmin/api/r0303/searchr030301
+   ต้องแนบ Authorization: Bearer <token จากการ login>                      */
+const REPORT_API = "https://twqonline.mwa.co.th/TWQMSServiceadmin/api/r0303/searchr030301";
+let TW_TOKEN = ""; // วาง token หรือทำหน้า login ภายหลัง
+const TW_CODE = {"18":"SW01","9":"SW02","17":"SW03","14":"SW04","20":"SW05","15":"SW06",
+                 "19":"SW07","5":"SW08","4":"SW09","16":"SW10",
+                 "TR1":"SP01","TR2":"SP02","TR3":"SP03","MTR":"SP11"};
+function buildPayload(type, stId, dateStr){
+  return {
+    reportType:{daily:"D",monthly:"M",yearly:"Y"}[type]||"D", // M/Y รอยืนยันจากระบบจริง
+    paramCode:"D", dataDtmStart:dateStr+"T00:00:00", dataDtmEnd:"",
+    exportType:"", paramCodes:null, remark:"",
+    stationCodes:[TW_CODE[stId]||stId], stationLv1Codes:null, templateRangeId:null
+  };
+}
+// พารามิเตอร์ตามรหัสตัวเลขของระบบ twqonline (ยืนยันจาก response จริง 13/07/2569)
+const PARAM_DEF = {
+  3:["คลอรีนอิสระคงเหลือขาเข้า","mg/L"],   // เลขขาเข้ารอยืนยันจากสถานีสูบจ่าย
+  2:["คลอรีนอิสระคงเหลือ","mg/L"],
+  1:["ความขุ่น","NTU"], 4:["ความเป็นกรด-ด่าง",""], 5:["ความนำไฟฟ้า","µS/cm"],
+  6:["อุณหภูมิ","°C"], 9:["ความเค็ม","g/L"], 10:["คลอไรด์","mg/L"],
+  7:["ความกระด้าง","mg/L"], 8:["แรงดันน้ำ","MPa"]
+};
+const PARAM_ORDER=[3,2,1,4,5,6,9,10,7,8];
+async function fetchTwq(type, stId, dateStr){
+  const r = await fetch(REPORT_API, {
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+TW_TOKEN},
+    body:JSON.stringify(buildPayload(type,stId,dateStr))
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return await r.json();
+}
+function fmtV(v){return v==null?"-":(+v).toFixed(2).replace(/\.00$/,function(m){return (+v)%1===0&&Math.abs(v)>=100?"":m;});}
+
 
 const STATIONS = {
   "9":"สถานีสูบจ่ายน้ำลาดพร้าว","18":"สถานีสูบจ่ายน้ำลุมพินี","17":"สถานีสูบจ่ายน้ำคลองเตย",
@@ -174,11 +212,26 @@ function frcClass(v){v=parseFloat(v);return v<0.5?"bad":(v<0.8?"warn":"");}
 
 let lastRows=null,lastMeta=null;
 
+let lastTwq=null;
+function setToken(){
+  var t=prompt("วาง Token จาก twqonline (Bearer ...)\nดูได้จาก DevTools > Network > request ใดก็ได้ > Headers > authorization\n(token หมดอายุ ~8 ชม. ต้องใส่ใหม่)");
+  if(t){TW_TOKEN=t.replace(/^Bearer\s+/i,"").trim();document.getElementById("tokBtn").textContent="🔑 เชื่อมแล้ว ✓";}
+}
 async function runReport(){
   var type=document.getElementById("repType").value;
   var stId=document.getElementById("stSel").value;
   var dateStr=document.getElementById("dateSel").value;
   if(!dateStr){alert("กรุณาเลือกวันที่");return;}
+  if(TW_TOKEN){
+    try{
+      var raw=await fetchTwq(type==="frcsum"?"daily":type, stId, dateStr);
+      renderTwq(raw, stId, type, dateStr);
+      return;
+    }catch(e){
+      alert("ดึงข้อมูลจริงไม่สำเร็จ: "+e.message+"\n(token หมดอายุ หรือติด CORS) — แสดงข้อมูลตัวอย่างแทน");
+    }
+  }
+  lastTwq=null;
   var rows=await fetchReport(type==="frcsum"?"daily":type, stId, dateStr);
   lastRows=rows;
   var typeName={daily:"รายงานคุณภาพน้ำรายวัน",monthly:"รายงานคุณภาพน้ำรายเดือน",yearly:"รายงานคุณภาพน้ำรายปี",frcsum:"รายงานสรุปผลค่าคลอรีนอิสระคงเหลือ"}[type];
@@ -212,7 +265,69 @@ async function runReport(){
   document.getElementById("emptyCard").style.display="none";
 }
 
+function renderTwq(rows, stId, type, dateStr){
+  lastRows=null;
+  var params=PARAM_ORDER.filter(function(p){return rows.some(function(r){return r["avg"+p]!=null;});});
+  var hourRows=rows.filter(function(r){return r.dataDtm!=null;});
+  var sumRow=rows.find(function(r){return r.dataDtm==null&&r.dataDtmHh&&r.dataDtmHh.indexOf("สูงสุด")>=0;});
+  var pRows=rows.filter(function(r){return r.dataDtmHh==="P5"||r.dataDtmHh==="P95";});
+  var typeName={daily:"รายงานคุณภาพน้ำรายวัน",monthly:"รายงานคุณภาพน้ำรายเดือน",yearly:"รายงานคุณภาพน้ำรายปี",frcsum:"รายงานสรุปผลค่าคลอรีนอิสระคงเหลือ"}[type];
+  document.getElementById("repTitle").textContent=typeName+" วันที่ "+thDate(dateStr);
+  document.getElementById("repSub").textContent=(rows[0]&&rows[0].stationName)||STATIONS[stId];
+  document.getElementById("srcNote").innerHTML='<span style="color:#1fa14a;font-weight:700">● ข้อมูลจริงจากระบบ twqonline</span>';
+  var head='<thead><tr><th rowspan="2">วันที่</th>';
+  params.forEach(function(p){head+='<th colspan="3" class="grp">'+PARAM_DEF[p][0]+(PARAM_DEF[p][1]?' ('+PARAM_DEF[p][1]+')':'')+'</th>';});
+  head+='</tr><tr>'+('<th>สูงสุด</th><th>ต่ำสุด</th><th>ค่าเฉลี่ย</th>').repeat(params.length)+'</tr></thead>';
+  var body='<tbody>';
+  hourRows.forEach(function(r){
+    body+='<tr><td>'+(r.dataDtmHh||"")+'</td>';
+    params.forEach(function(p){
+      ["max","min","avg"].forEach(function(k){
+        var v=r[k+p];
+        var cls=(p===2||p===3)&&v!=null?frcClass(v):"";
+        body+='<td class="'+cls+'">'+fmtV(v)+'</td>';
+      });
+    });
+    body+='</tr>';
+  });
+  if(sumRow){
+    body+='<tr class="sum"><td>สรุปทั้งวัน</td>';
+    params.forEach(function(p){["max","min","avg"].forEach(function(k){
+      var v=sumRow[k+p],cls=(p===2||p===3)&&v!=null?frcClass(v):"";
+      body+='<td class="'+cls+'">'+fmtV(v)+'</td>';});});
+    body+='</tr>';
+  }
+  pRows.forEach(function(r){
+    body+='<tr class="sum"><td>'+r.dataDtmHh+'</td>';
+    params.forEach(function(p){body+='<td>-</td><td>-</td><td>'+fmtV(r["avg"+p])+'</td>';});
+    body+='</tr>';
+  });
+  body+='</tbody>';
+  document.getElementById("repTable").innerHTML=head+body;
+  lastTwq={params:params,rows:hourRows.concat(sumRow?[sumRow]:[],pRows),station:(rows[0]&&rows[0].stationName)||STATIONS[stId],typeName:typeName,when:thDate(dateStr)};
+  document.getElementById("resultCard").style.display="block";
+  document.getElementById("emptyCard").style.display="none";
+}
 function exportCSV(){
+  if(lastTwq){
+    var head=["วันที่"];
+    lastTwq.params.forEach(function(p){var n=PARAM_DEF[p][0];head.push(n+" สูงสุด",n+" ต่ำสุด",n+" เฉลี่ย");});
+    var lines=[lastTwq.typeName+" "+lastTwq.when, lastTwq.station, head.join(",")];
+    lastTwq.rows.forEach(function(r){
+      var row=[r.dataDtmHh||""];
+      lastTwq.params.forEach(function(p){row.push(fmtV(r["max"+p]),fmtV(r["min"+p]),fmtV(r["avg"+p]));});
+      lines.push(row.join(","));
+    });
+    var blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="report_twq_"+document.getElementById("dateSel").value+".csv";
+    a.click();
+    return;
+  }
+  _exportMockCSV();
+}
+function _exportMockCSV(){
   if(!lastRows){alert("กดค้นหาก่อนครับ");return;}
   var lines=[lastMeta.typeName+" "+lastMeta.when, lastMeta.station,
     "วันที่,FRC ขาเข้า สูงสุด,FRC ขาเข้า ต่ำสุด,FRC ขาเข้า เฉลี่ย,FRC ขาออก สูงสุด,FRC ขาออก ต่ำสุด,FRC ขาออก เฉลี่ย,ความขุ่น สูงสุด,ความขุ่น ต่ำสุด,ความขุ่น เฉลี่ย,pH สูงสุด,pH ต่ำสุด,pH เฉลี่ย,อุณหภูมิ สูงสุด,อุณหภูมิ ต่ำสุด,อุณหภูมิ เฉลี่ย"];
