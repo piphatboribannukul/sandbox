@@ -320,7 +320,7 @@ function tankIconURL(d){
   var inC=dark?"#67e8f9":"#0369a1";
   var outC=dark?"#4ade80":"#15803d";
   var halo=dark?"#04070f":"#ffffff";
-  var inTxt=d.frcIn!=null?d.frcIn.toFixed(2):"--",outTxt=d.frcOut!=null?d.frcOut.toFixed(2):"--";
+  var inTxt=(d.frcIn!=null&&d.frcIn>0)?d.frcIn.toFixed(2):"-",outTxt=d.frcOut!=null?d.frcOut.toFixed(2):"-";
   var lv=(d.level||0).toFixed(2);
   var vol=Math.round((d.level||0)*(d.area||0)).toLocaleString("en-US");
   var cx=72,hw=42,dy=13,topY=74,hgt=30;
@@ -488,7 +488,7 @@ function pushHist(id,v){var _h=(S.hist[id]=S.hist[id]||[]);if(v!=null){_h.push(v
 function loadMock(){
   IDS.forEach(function(id){var mk=MOCK[id],m=META[id];
     var kt=(!mk.bypass&&mk.frcIn&&mk.frcOut&&mk.frcOut<mk.frcIn)?-Math.log(mk.frcOut/mk.frcIn):null;
-    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:mk.frcIn,frcOut:mk.frcOut,turb:mk.turb,tempOut:mk.temp,ph:mk.ph,dt:new Date().toLocaleString("th-TH"),kt:kt,t:(4*m.area)/m.flow,kHist:m.k,bypass:!!mk.bypass,dosing:(mk.frcOut>mk.frcIn)&&!mk.bypass,hasBooster:(mk.frcOut>mk.frcIn)&&!mk.bypass,level:3.2+Math.random()*1.8});
+    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:mk.frcIn,frcOut:mk.frcOut,turb:mk.turb,tempOut:mk.temp,ph:mk.ph,dt:new Date().toLocaleString("th-TH"),kt:kt,t:(4*m.area)/m.flow,kHist:m.k,bypass:!!mk.bypass,dosing:(mk.frcIn!=null&&mk.frcOut>mk.frcIn)&&!mk.bypass,hasBooster:(mk.frcIn!=null&&mk.frcOut>mk.frcIn)&&!mk.bypass,level:3.2+Math.random()*1.8});
     pushHist(id,(mk.frcOut||1)+(Math.random()-0.5)*0.07);});
   setBadge("DEMO MODE");
   renderRanking();if(S.selectedId)renderInfo();
@@ -515,7 +515,7 @@ function loadLive(){
   var ok=0;
   return Promise.all(IDS.map(function(id){return fT(API+"/station/"+id,6000).then(function(r){return r.json();}).then(function(d){
     var sc=d.data&&d.data.scada&&d.data.scada[0],m=META[id];if(!sc)return;
-    var frcOut=sc.Chlorine,frcIn=sc.FREE_CL_INLET!=null?sc.FREE_CL_INLET/100:null;
+    var frcOut=sc.Chlorine,frcIn=(sc.FREE_CL_INLET!=null&&sc.FREE_CL_INLET>0)?sc.FREE_CL_INLET/100:null;
     // Bypass: น้ำเข้าถังเก็บน้ำใส (FLOW_INLET_STATION, m3/hr) ต่ำผิดปกติ
     // เทียบกับอัตราจ่ายพิกัดของสถานี (m.flow) — ปกติน้ำเข้าถังหลักพัน m3/hr
     // เกณฑ์ 5% ปรับได้ | ไม่ใช้ FLOW_OUTLET เพราะสถานีไม่มีมิเตอร์ขาออกจริง
@@ -525,7 +525,7 @@ function loadLive(){
     var kt=(!bypass&&!dosing&&frcIn&&frcOut&&frcOut<frcIn)?-Math.log(frcOut/frcIn):null;
     // ระดับน้ำจริง: เปลี่ยน sc.LEVEL เป็นชื่อ field จาก SCADA เมื่อทราบ (รอเชื่อม API)
     var lvl=sc.LEVEL!=null?sc.LEVEL:(sc.Level!=null?sc.Level:4.0);
-    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:frcIn,frcOut:frcOut,turb:sc.Turbidity,tempOut:sc.TEMP_OUTLET/100,ph:sc.PH,dt:sc.LogDateTime,kt:kt,t:(lvl*m.area)/m.flow,kHist:m.k,bypass:bypass,dosing:dosing,hasBooster:dosing||((frcOut>frcIn)&&!bypass),level:lvl});
+    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:frcIn,frcOut:frcOut,turb:sc.Turbidity,tempOut:sc.TEMP_OUTLET/100,ph:sc.PH,dt:sc.LogDateTime,kt:kt,t:(lvl*m.area)/m.flow,kHist:m.k,bypass:bypass,dosing:dosing,hasBooster:dosing||(frcIn!=null&&frcOut>frcIn&&!bypass),level:lvl});
     pushHist(id,frcOut);ok++;
   }).catch(function(){});})).then(function(){
     if(ok===0){
@@ -612,7 +612,7 @@ function renderInfo(){
   var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+'</div>'+
     '<div class="stat-row"><span class="stat-label">ปั๊มจ่ายคลอรีน</span><span class="stat-value mono" style="color:'+(s.dosing?"#a78bfa":"#7d93ab")+'">'+(s.dosing?"ทำงาน (Booster)":"หยุด")+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">สถานะการจ่าย</span><span class="stat-value mono" style="color:'+(s.bypass?"#fbbf24":"#34d399")+'">'+(s.bypass?"\u21c4 BYPASS ไม่ผ่านถัง":"ปกติ ผ่านถังน้ำใส")+'</span></div>'+
-    '<div class="stat-row"><span class="stat-label">FRC Inlet</span><span class="stat-value mono" style="color:#67e8f9">'+(s.frcIn!=null?s.frcIn.toFixed(2):"—")+' mg/L</span></div>'+
+    '<div class="stat-row"><span class="stat-label">FRC Inlet</span><span class="stat-value mono" style="color:#67e8f9">'+((s.frcIn!=null&&s.frcIn>0)?s.frcIn.toFixed(2):"—")+' mg/L</span></div>'+
     '<div class="stat-row"><span class="stat-label">FRC Outlet</span><span class="stat-value mono" style="color:'+(s.frcOut>=0.8?"#34d399":"#f87171")+'">'+(s.frcOut!=null?s.frcOut.toFixed(2):"—")+' mg/L</span></div>'+
     '<div class="stat-row"><span class="stat-label">Turbidity</span><span class="stat-value mono" style="color:#60a5fa">'+(s.turb!=null?s.turb.toFixed(2):"—")+' NTU</span></div>'+
     '<div class="stat-row"><span class="stat-label">Temp</span><span class="stat-value mono" style="color:#fbbf24">'+(s.tempOut!=null?s.tempOut.toFixed(1):"—")+' °C</span></div>'+
