@@ -239,7 +239,7 @@ const TRIPS=ROUTES2.map(function(r){
 const LOOP=Math.max.apply(null,TRIPS.map(function(t){return t.timestamps[t.timestamps.length-1];}))+140;
 let animTime=0;
 
-window.__S={stations:{},hist:{},selectedId:null,simLevel:4.0,simFlow:16000,threshold:0.8,layersOn:{pipe:true,area:true},theme:"dark"};
+window.__S={stations:{},hist:{},detailOpen:null,selectedId:null,simLevel:4.0,simFlow:16000,threshold:0.8,layersOn:{pipe:true,area:true},theme:"dark"};
 const S=window.__S;
 
 function frcColor(fo,booster){
@@ -488,10 +488,10 @@ function pushHist(id,v){var _h=(S.hist[id]=S.hist[id]||[]);if(v!=null){_h.push(v
 function loadMock(){
   IDS.forEach(function(id){var mk=MOCK[id],m=META[id];
     var kt=(!mk.bypass&&mk.frcIn&&mk.frcOut&&mk.frcOut<mk.frcIn)?-Math.log(mk.frcOut/mk.frcIn):null;
-    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:mk.frcIn,frcOut:mk.frcOut,turb:mk.turb,tempOut:mk.temp,ph:mk.ph,dt:new Date().toLocaleString("th-TH"),kt:kt,t:(4*m.area)/m.flow,kHist:m.k,bypass:!!mk.bypass,dosing:(mk.frcIn!=null&&mk.frcOut>mk.frcIn)&&!mk.bypass,hasBooster:(mk.frcIn!=null&&mk.frcOut>mk.frcIn)&&!mk.bypass,level:3.2+Math.random()*1.8});
+    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:mk.frcIn,frcOut:mk.frcOut,turb:mk.turb,tempOut:mk.temp,ph:mk.ph,dt:new Date().toLocaleString("th-TH"),kt:kt,t:(4*m.area)/m.flow,kHist:m.k,bypass:!!mk.bypass,p1:((mk.frcIn!=null&&mk.frcOut>mk.frcIn)&&!mk.bypass)?1:0,p2:0,conduct:Math.round(280+Math.random()*100),dosing:(mk.frcIn!=null&&mk.frcOut>mk.frcIn)&&!mk.bypass,hasBooster:(mk.frcIn!=null&&mk.frcOut>mk.frcIn)&&!mk.bypass,level:3.2+Math.random()*1.8});
     pushHist(id,(mk.frcOut||1)+(Math.random()-0.5)*0.07);});
   setBadge("DEMO MODE");
-  renderRanking();if(S.selectedId)renderInfo();
+  renderRanking();if(S.selectedId)renderInfo();if(S.detailOpen)renderDetail(S.detailOpen);
 }
 // สำรอง: twqonline public API (มีเฉพาะ FRC ขาออก)
 function loadPublic(){
@@ -502,12 +502,12 @@ function loadPublic(){
       var m=META[id],v=st.value||{};
       var fo=parseFloat(v.frc_2);if(isNaN(fo))fo=null;
       var tb=parseFloat(v.tub_1),to=parseFloat(v.tmpOut_8),ph=parseFloat(v.pph_4);
-      S.stations[id]=Object.assign({},m,{stationId:id,frcIn:null,frcOut:fo,turb:isNaN(tb)?null:tb,tempOut:isNaN(to)?null:to,ph:isNaN(ph)?null:ph,dt:st.sourceDtm,kt:null,t:(4*m.area)/m.flow,kHist:m.k,bypass:false,dosing:false,hasBooster:false,level:4.0});
+      S.stations[id]=Object.assign({},m,{stationId:id,frcIn:null,frcOut:fo,turb:isNaN(tb)?null:tb,tempOut:isNaN(to)?null:to,ph:isNaN(ph)?null:ph,dt:st.sourceDtm,kt:null,t:(4*m.area)/m.flow,kHist:m.k,bypass:false,dosing:false,p1:null,p2:null,conduct:(function(){var e=parseFloat(v.ecm_5);return isNaN(e)?null:e;})(),hasBooster:false,level:4.0});
       pushHist(id,fo);got++;
     });
     if(!got)throw new Error("no stations");
     setBadge("LIVE · PUBLIC API");
-    renderRanking();if(S.selectedId)renderInfo();
+    renderRanking();if(S.selectedId)renderInfo();if(S.detailOpen)renderDetail(S.detailOpen);
   });
 }
 // หลัก: intranet API (มี In+Out+level hook)
@@ -525,7 +525,7 @@ function loadLive(){
     var kt=(!bypass&&!dosing&&frcIn&&frcOut&&frcOut<frcIn)?-Math.log(frcOut/frcIn):null;
     // ระดับน้ำจริง: เปลี่ยน sc.LEVEL เป็นชื่อ field จาก SCADA เมื่อทราบ (รอเชื่อม API)
     var lvl=sc.LEVEL!=null?sc.LEVEL:(sc.Level!=null?sc.Level:4.0);
-    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:frcIn,frcOut:frcOut,turb:sc.Turbidity,tempOut:sc.TEMP_OUTLET/100,ph:sc.PH,dt:sc.LogDateTime,kt:kt,t:(lvl*m.area)/m.flow,kHist:m.k,bypass:bypass,dosing:dosing,hasBooster:dosing||(frcIn!=null&&frcOut>frcIn&&!bypass),level:lvl});
+    S.stations[id]=Object.assign({},m,{stationId:id,frcIn:frcIn,frcOut:frcOut,turb:sc.Turbidity,tempOut:sc.TEMP_OUTLET/100,ph:sc.PH,dt:sc.LogDateTime,kt:kt,t:(lvl*m.area)/m.flow,kHist:m.k,bypass:bypass,dosing:dosing,p1:sc.PUMP1_STS,p2:sc.PUMP2_STS,conduct:sc.Conduct,hasBooster:dosing||(frcIn!=null&&frcOut>frcIn&&!bypass),level:lvl});
     pushHist(id,frcOut);ok++;
   }).catch(function(){});})).then(function(){
     if(ok===0){
@@ -535,7 +535,7 @@ function loadLive(){
       });
     }
     setBadge("LIVE · INTRANET");
-    renderRanking();if(S.selectedId)renderInfo();
+    renderRanking();if(S.selectedId)renderInfo();if(S.detailOpen)renderDetail(S.detailOpen);
   });
 }
 // Smart Tunnel: ระดับน้ำถังสด + อัตราจ่ายจริง + น้ำเข้าถัง (Qin) ทุกสถานี
@@ -560,7 +560,7 @@ function fetchSmart(){
     S.smart=true;
     var el=document.querySelector(".badge span");
     if(el)el.textContent=el.textContent.replace(/ \+ระดับน้ำสด$/,"")+" +ระดับน้ำสด";
-    renderRanking();if(S.selectedId)renderInfo();
+    renderRanking();if(S.selectedId)renderInfo();if(S.detailOpen)renderDetail(S.detailOpen);
   }).catch(function(e){
     if(!S._smWarn&&!USE_MOCK){S._smWarn=true;
       showErr("เชื่อม smartmap (172.16.193.162) ไม่ได้ — ระดับน้ำใช้ค่าสมมติ 4.0 ม. (มักเกิดจาก CORS ดู Console)");}
@@ -596,6 +596,7 @@ function renderRanking(){
 }
 
 window.selectStation=function(id){
+  if(S.selectedId===id&&S.stations[id]){openDetail(id);return;}
   S.selectedId=id;
   var st=S.stations[id];
   S.simLevel=(st&&st.level)?Math.round(st.level*10)/10:4.0;
@@ -609,7 +610,7 @@ function renderInfo(){
   var panel=document.getElementById("infoPanel");panel.classList.add("show");
   var kd=s.kHist,canCalc=kd&&kd>0;
   var srcName={MTR:"สูบส่งมหาสวัสดิ์ (MTR)",TR1:"สูบส่งบางเขน 1 (TR1)",TR2:"สูบส่งบางเขน 2 (TR2)",TR3:"สูบส่งบางเขน 3 (TR3)"}[s.src]||"—";
-  var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+'</div>'+
+  var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
     '<div class="stat-row"><span class="stat-label">ปั๊มจ่ายคลอรีน</span><span class="stat-value mono" style="color:'+(s.dosing?"#a78bfa":"#7d93ab")+'">'+(s.dosing?"ทำงาน (Booster)":"หยุด")+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">สถานะการจ่าย</span><span class="stat-value mono" style="color:'+(s.bypass?"#fbbf24":"#34d399")+'">'+(s.bypass?"\u21c4 BYPASS ไม่ผ่านถัง":"ปกติ ผ่านถังน้ำใส")+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">FRC Inlet</span><span class="stat-value mono" style="color:#67e8f9">'+((s.frcIn!=null&&s.frcIn>0)?s.frcIn.toFixed(2):"—")+' mg/L</span></div>'+
@@ -645,6 +646,139 @@ function renderInfo(){
 }
 window.closeInfo=function(){S.selectedId=null;document.getElementById("infoPanel").classList.remove("show");};
 window.upd=function(k,v){if(k==="lv")S.simLevel=+v;else if(k==="fl")S.simFlow=+v;else if(k==="th")S.threshold=+v;renderInfo();};
+
+
+// ===== หน้ารายละเอียดสถานี (ระบบจ่ายคลอรีนเสริม) =====
+function ensureDetailDom(){
+  if(document.getElementById("detailPage"))return;
+  var st=document.createElement("style");
+  st.textContent=
+    ".dp-wrap{position:fixed;inset:0;z-index:250;background:rgba(4,8,16,0.9);backdrop-filter:blur(8px);display:none;overflow:auto;padding:24px 18px;font-family:'IBM Plex Sans Thai',sans-serif}"
+    +".dp-wrap.show{display:block}"
+    +".dp-inner{max-width:1060px;margin:0 auto;background:#0a1220;border:1px solid rgba(56,189,248,0.28);border-radius:16px;padding:18px;box-shadow:0 20px 70px rgba(0,0,0,0.5)}"
+    +".dp-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:14px}"
+    +".dp-back{border:1px solid #2b4159;color:#8fb3cc;border-radius:8px;padding:6px 13px;font-size:12.5px;cursor:pointer;background:transparent;font-family:inherit}"
+    +".dp-back:hover{color:#67e8f9;border-color:#22d3ee}"
+    +".dp-title{font-size:17px;font-weight:700;color:#e2eefc}"
+    +".dp-chip{border-radius:12px;padding:3px 10px;font-size:11.5px;border:1px solid}"
+    +".dp-row{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap}"
+    +".dp-card{background:#0e1a2c;border:1px solid #1d3a57;border-radius:12px;padding:12px}"
+    +".dp-lbl{font-size:12px;margin-bottom:8px;font-weight:600}"
+    +".dp-tbl{width:100%;font-size:12px;border-collapse:collapse}.dp-tbl td{padding:3px 0;color:#8fb3cc}.dp-tbl td:last-child{text-align:right;font-family:'JetBrains Mono',monospace;color:#e2eefc}"
+    +".dp-flow{flex:1;min-width:330px;display:flex;flex-direction:column;justify-content:center}"
+    +".dp-frc{border-radius:9px;padding:5px 10px;text-align:center;border:1px solid}"
+    +".dp-arr{flex:1;text-align:center;min-width:72px}"
+    +".dp-line{height:3px;margin:4px 0;border-radius:2px;background:repeating-linear-gradient(90deg,currentColor 0 10px,transparent 10px 18px);animation:dpflow .55s linear infinite}"
+    +"@keyframes dpflow{to{background-position:18px 0}}"
+    +".dp-note{margin-top:10px;border-top:1px dashed #48596e;padding-top:6px;font-size:11.5px;text-align:center}"
+    +".dp-reco{margin-top:12px;background:#0e1a2c;border:1px solid #3c3489;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}";
+  document.head.appendChild(st);
+  var d=document.createElement("div");
+  d.id="detailPage";d.className="dp-wrap";
+  d.innerHTML='<div class="dp-inner" id="dpInner"></div>';
+  d.addEventListener("click",function(e){if(e.target===d)closeDetail();});
+  document.body.appendChild(d);
+  document.addEventListener("keydown",function(e){if(e.key==="Escape")closeDetail();});
+}
+function openDetail(id){
+  ensureDetailDom();
+  S.detailOpen=id;
+  renderDetail(id);
+  document.getElementById("detailPage").classList.add("show");
+}
+function closeDetail(){
+  S.detailOpen=null;
+  var d=document.getElementById("detailPage");
+  if(d)d.classList.remove("show");
+}
+window.openDetail=openDetail;window.closeDetail=closeDetail;
+function renderDetail(id){
+  var s=S.stations[id];
+  var el=document.getElementById("dpInner");
+  if(!s||!el)return;
+  var f=Math.max(0.06,Math.min((s.level||0)/(s.maxLv||6),1));
+  var cx=82,hw=58,dy=19,topY=30,hgt=52,botF=topY+2*dy+hgt,wf=botF-f*hgt;
+  var P=function(x,y){return x+","+y;};
+  var inTxt=(s.frcIn!=null&&s.frcIn>0)?s.frcIn.toFixed(2):"—";
+  var outTxt=s.frcOut!=null?s.frcOut.toFixed(2):"—";
+  var qin=s.qin!=null?Math.round(s.qin).toLocaleString():"—";
+  var fl=s.flowLive!=null?Math.round(s.flowLive).toLocaleString():"—";
+  var vol=(s.level!=null&&s.area)?Math.round(s.level*s.area).toLocaleString():"—";
+  var lv=s.level!=null?s.level.toFixed(2):"—";
+  var chipP=function(n,v){
+    if(v==null)return '<span class="dp-chip" style="background:#1a2433;color:#8fb3cc;border-color:#2b4159">'+n+' —</span>';
+    return v===1
+      ?'<span class="dp-chip" style="background:#0f2b22;color:#4ade80;border-color:#1d5c40">'+n+' ทำงาน</span>'
+      :'<span class="dp-chip" style="background:#1a2433;color:#8fb3cc;border-color:#2b4159">'+n+' หยุด</span>';
+  };
+  var tank='<svg width="196" height="128" viewBox="0 0 196 128">'
+    +'<text x="82" y="11" text-anchor="middle" font-size="11" fill="#8fb3cc">ถังเก็บน้ำใส</text>'
+    +'<ellipse cx="82" cy="121" rx="70" ry="6" fill="#000" opacity="0.4"/>'
+    +'<polygon points="'+P(cx-hw,topY+dy)+' '+P(cx,topY+2*dy)+' '+P(cx,botF)+' '+P(cx-hw,botF-dy)+'" fill="#0e2a44" fill-opacity="0.9" stroke="#38bdf8" stroke-width="1.3"/>'
+    +'<polygon points="'+P(cx,topY+2*dy)+' '+P(cx+hw,topY+dy)+' '+P(cx+hw,botF-dy)+' '+P(cx,botF)+'" fill="#0b2135" fill-opacity="0.9" stroke="#38bdf8" stroke-width="1.3"/>'
+    +'<polygon points="'+P(cx-hw,wf-dy)+' '+P(cx,wf)+' '+P(cx,botF)+' '+P(cx-hw,botF-dy)+'" fill="#0ea5e9" fill-opacity="0.5"/>'
+    +'<polygon points="'+P(cx,wf)+' '+P(cx+hw,wf-dy)+' '+P(cx+hw,botF-dy)+' '+P(cx,botF)+'" fill="#0ea5e9" fill-opacity="0.38"/>'
+    +'<polygon points="'+P(cx,wf)+' '+P(cx+hw,wf-dy)+' '+P(cx,wf-2*dy)+' '+P(cx-hw,wf-dy)+'" fill="#7dd3fc" fill-opacity="0.42"/>'
+    +'<polyline points="'+P(cx-hw,wf-dy)+' '+P(cx,wf)+' '+P(cx+hw,wf-dy)+'" fill="none" stroke="#7dd3fc" stroke-width="1.6"/>'
+    +'<polygon points="'+P(cx-hw,topY+dy)+' '+P(cx,topY+2*dy)+' '+P(cx+hw,topY+dy)+' '+P(cx,topY)+'" fill="#12395c" fill-opacity="0.92" stroke="#7dd3fc" stroke-width="1.2"/>'
+    +'<line x1="'+(cx+hw)+'" y1="'+(wf-dy)+'" x2="'+(cx+hw+8)+'" y2="'+(wf-dy)+'" stroke="#7dd3fc" stroke-width="1.5"/>'
+    +'<text x="'+(cx+hw+11)+'" y="'+(wf-dy+4)+'" font-size="13" font-weight="700" fill="#7dd3fc" font-family="JetBrains Mono,monospace">'+lv+' m</text>'
+    +'<line x1="'+(cx+hw)+'" y1="'+(topY+dy)+'" x2="'+(cx+hw+6)+'" y2="'+(topY+dy)+'" stroke="#48596e" stroke-width="1"/>'
+    +'<text x="'+(cx+hw+9)+'" y="'+(topY+dy+4)+'" font-size="10.5" fill="#48596e" font-family="JetBrains Mono,monospace">max '+(s.maxLv||"—")+'</text>'
+    +'</svg>';
+  var strip=s.bypass
+    ?'<div class="dp-note" style="color:#fbbf24;border-color:#7a5c14">\u21c4 BYPASS — น้ำวิ่งตรง ไม่ผ่านถัง (retention \u2248 0)</div>'
+    :'<div class="dp-note" style="color:#7dd3fc;border-color:#1d3a57">Retention time \u2248 '+(s.t?s.t.toFixed(1):"—")+' ชม. (ระดับ \u00d7 พื้นที่ \u00f7 อัตราจ่าย)</div>';
+  el.innerHTML=
+    '<div class="dp-head">'
+    +'<button class="dp-back" onclick="closeDetail()">\u2190 กลับแผนที่</button>'
+    +'<span class="dp-title">'+s.code+' \u00b7 สถานีสูบจ่ายน้ำ'+s.name+'</span>'
+    +(s.bypass?'<span class="dp-chip" style="background:#3a2d10;color:#fbbf24;border-color:#7a5c14">\u21c4 bypass</span>':'')
+    +chipP("P1",s.p1)+chipP("P2",s.p2)
+    +'<span style="margin-left:auto;color:#4ade80;font-size:11.5px">\u25cf '+(s.lvLive?"LIVE ":"")+(s.dt||"")+'</span>'
+    +'</div>'
+    +'<div class="dp-row">'
+    +'<div class="dp-card" style="width:150px;border-color:#7a5c14">'
+      +'<div class="dp-lbl" style="color:#fbbf24">ถังเก็บคลอรีนน้ำ</div>'
+      +'<svg width="50" height="56" viewBox="0 0 52 58" style="display:block;margin:0 auto 8px">'
+      +'<path d="M6 8 L6 46 A20 8 0 0 0 46 46 L46 8" fill="#1a2433" stroke="#b98a1e" stroke-width="1.2"/>'
+      +'<path d="M6 26 L6 46 A20 8 0 0 0 46 46 L46 26 A20 8 0 0 1 6 26" fill="#eab308" fill-opacity="0.5"/>'
+      +'<ellipse cx="26" cy="26" rx="20" ry="8" fill="#facc15" fill-opacity="0.45"/>'
+      +'<ellipse cx="26" cy="8" rx="20" ry="8" fill="#243247" stroke="#b98a1e" stroke-width="1.2"/></svg>'
+      +'<table class="dp-tbl"><tr><td>ระดับ</td><td style="color:#fde68a">—</td></tr>'
+      +'<tr><td>ปริมาตร</td><td style="color:#fde68a">—</td></tr>'
+      +'<tr><td>อัตราจ่าย</td><td style="color:#fde68a">—</td></tr></table>'
+      +'<div style="font-size:9.5px;color:#7a6a3a;margin-top:6px">รอเชื่อมข้อมูลตู้จ่ายคลอรีน</div>'
+    +'</div>'
+    +'<div class="dp-card dp-flow">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<div class="dp-frc" style="background:#0a2733;border-color:#155e75"><div style="font-size:11px;color:#67e8f9">FRC เข้า</div><div style="font-size:16px;color:#67e8f9;font-family:JetBrains Mono,monospace;font-weight:700">'+inTxt+'</div></div>'
+      +'<div class="dp-arr" style="color:#38bdf8"><div style="font-size:11px;color:#7dd3fc">น้ำเข้าถัง</div><div class="dp-line"></div><div style="font-size:12px;color:#7dd3fc;font-family:JetBrains Mono,monospace">'+qin+' m\u00b3/h</div></div>'
+      +'<div style="text-align:center">'+tank+'<div style="font-size:11.5px;color:#e2eefc;font-family:JetBrains Mono,monospace">ปริมาตรน้ำ '+vol+' m\u00b3</div></div>'
+      +'<div class="dp-arr" style="color:#4ade80"><div style="font-size:11px;color:#4ade80">น้ำออกถัง</div><div class="dp-line"></div><div style="font-size:12px;color:#4ade80;font-family:JetBrains Mono,monospace">'+fl+' m\u00b3/h</div></div>'
+      +'<div class="dp-frc" style="background:#0f2b22;border-color:#1d5c40"><div style="font-size:11px;color:#4ade80">FRC ออก</div><div style="font-size:16px;color:#4ade80;font-family:JetBrains Mono,monospace;font-weight:700">'+outTxt+'</div></div>'
+      +'</div>'+strip
+    +'</div>'
+    +'<div class="dp-card" style="width:168px">'
+      +'<div class="dp-lbl" style="color:#67e8f9">คุณภาพน้ำประปา</div>'
+      +'<table class="dp-tbl">'
+      +'<tr><td>FRC ออก</td><td style="color:#4ade80">'+outTxt+' mg/L</td></tr>'
+      +'<tr><td>ความขุ่น</td><td>'+(s.turb!=null?s.turb.toFixed(2):"—")+' NTU</td></tr>'
+      +'<tr><td>pH</td><td>'+(s.ph!=null?s.ph.toFixed(2):"—")+'</td></tr>'
+      +'<tr><td>EC</td><td>'+(s.conduct!=null?Math.round(s.conduct):"—")+' \u00b5S/cm</td></tr>'
+      +'<tr><td>อุณหภูมิ</td><td>'+(s.tempOut!=null?s.tempOut.toFixed(1):"—")+' \u00b0C</td></tr>'
+      +'</table>'
+    +'</div>'
+    +'</div>'
+    +'<div class="dp-reco">'
+    +'<div><div style="font-size:12px;color:#afa9ec">อัตราแนะนำการจ่ายคลอรีนเสริม</div>'
+    +'<div style="font-size:24px;font-weight:700;color:#cecbf6;font-family:JetBrains Mono,monospace">— <span style="font-size:12px;color:#8fb3cc">ลิตร/ชม.</span></div></div>'
+    +'<div style="flex:1;min-width:220px;font-size:11.5px;color:#8fb3cc;border-left:2px solid #3c3489;padding-left:12px">'
+    +'สูตร: inlet flow \u00d7 (FRC เป้าหมาย \u2212 FRC เข้า) \u00d7 factor \u00f7 (100 \u00d7 S.G.)<br>'
+    +'<span style="color:#7f77dd">ช่องนี้เว้นไว้ — รอกำหนดสูตรและพารามิเตอร์ร่วมกัน</span></div>'
+    +'<button class="dp-back" style="border-color:#3c3489;color:#afa9ec" onclick="alert(\'รอกำหนดสูตรร่วมกันก่อนครับ\')">คำนวณ</button>'
+    +'</div>';
+}
 
 function updateClock(){var n=new Date();document.getElementById("clock").textContent=n.toLocaleTimeString("th-TH",{hour12:false});document.getElementById("clockDate").textContent=n.toLocaleDateString("th-TH",{weekday:"short",day:"numeric",month:"short",year:"numeric"});}
 setInterval(updateClock,1000);updateClock();
