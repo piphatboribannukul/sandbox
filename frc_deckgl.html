@@ -9,6 +9,7 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -94,7 +95,7 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
       <button id="btn-dark" class="theme-btn active" onclick="setTheme('dark')">🌑 มืด</button>
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
     </div>
-    <a href="frc_dashboard.html" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
+    <a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
     <a href="frc_report.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📄 รายงาน</a>
     <div class="badge"><div class="dot"></div><span>DEMO MODE</span></div>
   </div>
@@ -741,7 +742,10 @@ var FB_CONFIG={
   projectId:"wqcmap-7f9d2"
 };
 var FB=null;
-try{if(FB_CONFIG&&typeof firebase!=="undefined"){firebase.initializeApp(FB_CONFIG);FB=firebase.database();}}catch(e){console.warn("Firebase init:",e);}
+try{if(FB_CONFIG&&typeof firebase!=="undefined"){
+  firebase.initializeApp(FB_CONFIG);FB=firebase.database();
+  firebase.auth().signInAnonymously().catch(function(e){console.warn("FB auth:",e.code);});
+}}catch(e){console.warn("Firebase init:",e);}
 S.fbSaved={};
 function fbSaveDose(){
   var id=S.detailOpen;if(!id)return;
@@ -749,10 +753,14 @@ function fbSaveDose(){
   if(!FB){if(el)el.textContent="ยังไม่ตั้งค่า Firebase (วาง FB_CONFIG ในโค้ด)";return;}
   window.dpCalc();
   var rec=Object.assign({},S.dose,{updatedAt:new Date().toISOString()});
-  FB.ref("frcTwin/dose/"+id).set(rec).then(function(){
-    S.fbSaved[id]=true;
-    if(el)el.textContent="บันทึกแล้ว ✓ "+new Date().toLocaleTimeString("th-TH");
-  }).catch(function(e){if(el)el.textContent="บันทึกไม่สำเร็จ: "+e.message;});
+  var doSet=function(){
+    FB.ref("frcTwin/dose/"+id).set(rec).then(function(){
+      S.fbSaved[id]=true;
+      if(el)el.textContent="บันทึกแล้ว ✓ "+new Date().toLocaleTimeString("th-TH");
+    }).catch(function(e){if(el)el.textContent="บันทึกไม่สำเร็จ: "+(e.code||e.message);});
+  };
+  if(firebase.auth().currentUser)doSet();
+  else firebase.auth().signInAnonymously().then(doSet).catch(function(e){if(el)el.textContent="ยืนยันตัวตนไม่สำเร็จ: "+(e.code||e.message)+" (เปิด Anonymous ใน Console หรือยัง?)";});
 }
 window.fbSaveDose=fbSaveDose;
 function fbLoadDose(id){
