@@ -7,6 +7,8 @@
 <script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js" crossorigin="anonymous" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/deck.gl@8.9.36/dist.min.js';s.crossOrigin='anonymous';document.head.appendChild(s);"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js" crossorigin="anonymous"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -718,6 +720,7 @@ function openDetail(id){
   ensureDetailDom();
   S.detailOpen=id;
   renderDetail(id);
+  fbLoadDose(id);
   loadChlorineInfo(id);
   document.getElementById("detailPage").classList.add("show");
 }
@@ -728,6 +731,40 @@ function closeDetail(){
 }
 window.openDetail=openDetail;window.closeDetail=closeDetail;
 var CHL_HOST="http://172.16.196.100";
+// ================= Firebase (บันทึกค่าพารามิเตอร์ข้ามเครื่อง) =================
+// วาง config ของ Firebase project ตรงนี้ (ใช้ project เดียวกับ FRCContour ได้)
+// ตัวอย่าง: var FB_CONFIG={apiKey:"...",authDomain:"xxx.firebaseapp.com",databaseURL:"https://xxx-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"xxx"};
+var FB_CONFIG={
+  apiKey:"AIzaSyBMv3wQI02clGMHnna4XaIx078G7kaSYqg",
+  authDomain:"wqcmap-7f9d2.firebaseapp.com",
+  databaseURL:"https://wqcmap-7f9d2-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"wqcmap-7f9d2"
+};
+var FB=null;
+try{if(FB_CONFIG&&typeof firebase!=="undefined"){firebase.initializeApp(FB_CONFIG);FB=firebase.database();}}catch(e){console.warn("Firebase init:",e);}
+S.fbSaved={};
+function fbSaveDose(){
+  var id=S.detailOpen;if(!id)return;
+  var el=document.getElementById("dpSaveMsg");
+  if(!FB){if(el)el.textContent="ยังไม่ตั้งค่า Firebase (วาง FB_CONFIG ในโค้ด)";return;}
+  window.dpCalc();
+  var rec=Object.assign({},S.dose,{updatedAt:new Date().toISOString()});
+  FB.ref("frcTwin/dose/"+id).set(rec).then(function(){
+    S.fbSaved[id]=true;
+    if(el)el.textContent="บันทึกแล้ว ✓ "+new Date().toLocaleTimeString("th-TH");
+  }).catch(function(e){if(el)el.textContent="บันทึกไม่สำเร็จ: "+e.message;});
+}
+window.fbSaveDose=fbSaveDose;
+function fbLoadDose(id){
+  if(!FB)return;
+  FB.ref("frcTwin/dose/"+id).once("value").then(function(snap){
+    var v=snap.val();if(!v)return;
+    S.fbSaved[id]=true;
+    S.dose=Object.assign({},v,{src:id});
+    if(S.detailOpen===id)renderDetail(id);
+  }).catch(function(){});
+}
+
 function loadChlorineInfo(id){
   var tryF=function(paths){
     return fT(API+paths,8000).then(function(r){if(!r.ok)throw 0;return r.json();})
@@ -737,7 +774,7 @@ function loadChlorineInfo(id){
   tryF("/chlorine/"+id).then(function(j){
     var c=j&&j.data;var st=S.stations[id];if(!c||!st)return;
     st.chl={target:parseFloat(c.frc),factor:parseFloat(c.factor),sg:parseFloat(c.sg),frcInlet:parseFloat(c.frcInlet),reco:parseFloat(c.chlorine),dt:c.updatedAt};
-    if(S.dose&&S.dose.src!==id){
+    if(S.dose&&S.dose.src!==id&&!S.fbSaved[id]){
       S.dose={target:st.chl.target,factor:st.chl.factor,sg:st.chl.sg,frcin:null,k:null,t:null,q:null,src:id};
     }
     if(S.detailOpen===id)renderDetail(id);
@@ -765,7 +802,7 @@ window.dpCalc=function(){
   var t=g("dpT"),fa=g("dpF"),sg=g("dpG"),kd=g("dpK"),rt=g("dpR"),q=g("dpQ");
   var ie=document.getElementById("dpI");
   var fi=(ie&&ie.value!=="")?parseFloat(ie.value):null;
-  S.dose={target:t,factor:fa,sg:sg,frcin:fi,k:isFinite(kd)?kd:null,t:isFinite(rt)?rt:null,q:isFinite(q)?q:null};
+  S.dose={target:t,factor:fa,sg:sg,frcin:fi,k:isFinite(kd)?kd:null,t:isFinite(rt)?rt:null,q:isFinite(q)?q:null,src:S.detailOpen};
   if(!isFinite(kd))kd=0;if(!isFinite(rt))rt=0;
   if(!isFinite(q))q=(s.qin!=null?s.qin:(s.fis!=null?s.fis:(s.flow||null)));
   var fin=(fi!=null&&isFinite(fi))?fi:((s.frcIn!=null&&s.frcIn>0)?s.frcIn:null);
@@ -1000,7 +1037,11 @@ function renderDetail(id){
       +'</span>'
       +'</div>'
       +'<div style="font-size:11.5px;color:#e8b4b8;margin-top:9px;text-align:center">FRC ขาออกคาดการณ์ (ยังไม่เติมเสริม): <span id="dpPred" style="color:#fde68a;font-family:JetBrains Mono,monospace;font-weight:700">—</span> mg/L · วัดจริง <span style="color:#a7f3d0;font-family:JetBrains Mono,monospace;font-weight:700">'+outTxt+'</span> mg/L</div>'
-      +'<button class="dp-back" style="border-color:#7a3d47;color:#f3c7cb;margin-top:8px;width:100%" onclick="dpCalc()">คำนวณ</button>' 
+      +'<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'
+      +'<button class="dp-back" style="border-color:#7a3d47;color:#f3c7cb;flex:1" onclick="dpCalc()">คำนวณ</button>'
+      +'<button class="dp-back" style="border-color:#1d5c40;color:#86efac;flex:1" onclick="fbSaveDose()">💾 บันทึก</button>'
+      +'</div>'
+      +'<div id="dpSaveMsg" style="font-size:10.5px;color:#7d93ab;margin-top:5px;text-align:center;min-height:14px">'+(S.fbSaved[id]?"ใช้ค่าที่บันทึกไว้":(FB?"":"ยังไม่ตั้งค่า Firebase — ค่าจะหายเมื่อเปลี่ยนหน้า"))+'</div>'  
     +'</div>'
     +'</div>';
   if(window.dpCalc)setTimeout(window.dpCalc,0);
