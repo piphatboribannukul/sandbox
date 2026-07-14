@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — ระบบตรวจสอบคุณภาพน้ำระบบจ่ายคลอรีนปลายสาย</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'IBM Plex Sans Thai',sans-serif;background:radial-gradient(1000px 500px at 20% -10%,rgba(34,211,238,0.08),transparent 60%),radial-gradient(800px 450px at 90% 0%,rgba(167,139,250,0.07),transparent 65%),#070d1a;color:#c8d6e5;min-height:100vh;padding:18px 22px 40px}
+.mono{font-family:'JetBrains Mono',monospace}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:18px;font-weight:700;background:linear-gradient(90deg,#22d3ee,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 10px rgba(34,211,238,0.3))}
+.sub{font-size:9px;color:#5b7089;letter-spacing:2.5px;text-transform:uppercase;margin-top:2px}
+.nav{display:flex;gap:6px;margin-left:auto}
+.nav a{color:#67e8f9;text-decoration:none;font-size:11.5px;font-weight:600;border:1px solid rgba(34,211,238,0.22);background:rgba(7,13,26,0.8);padding:6px 14px;border-radius:18px;transition:all .15s}
+.nav a:hover{background:rgba(34,211,238,0.12)}
+.nav a.on{background:rgba(34,211,238,0.22);box-shadow:0 0 12px rgba(34,211,238,0.3)}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:10px;padding:4px 12px;border-radius:20px;border:1px solid rgba(251,191,36,0.35);color:#fbbf24;background:rgba(10,18,34,0.75)}
+.dot{width:7px;height:7px;border-radius:50%;background:#fbbf24;box-shadow:0 0 8px #fbbf24;animation:bl 2s infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.35}}
+.clock{font-family:'JetBrains Mono';font-size:15px;color:#22d3ee;font-weight:700;text-shadow:0 0 12px rgba(34,211,238,0.5)}
+
+.glass{background:rgba(10,18,34,0.8);border:1px solid rgba(34,211,238,0.14);border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}
+.kpi{padding:13px 15px;text-align:center}
+.kpi .v{font-size:27px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1.2}
+.kpi .l{font-size:10.5px;color:#7d93ab;margin-top:2px}
+
+.grid2{display:grid;grid-template-columns:1.15fr 0.85fr;gap:14px;margin-bottom:14px}
+@media(max-width:980px){.grid2{grid-template-columns:1fr}}
+.panel{padding:14px 16px}
+.ptitle{font-size:10px;color:#5b7089;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:10px;color:#5b7089;text-transform:uppercase;letter-spacing:1px;text-align:right;padding:6px 8px;border-bottom:1px solid rgba(51,65,85,0.4);cursor:pointer;user-select:none;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th:hover{color:#67e8f9}
+td{padding:7px 8px;border-bottom:1px solid rgba(51,65,85,0.22);text-align:right;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+td.name{font-family:'IBM Plex Sans Thai';text-align:left}
+tr:hover td{background:rgba(34,211,238,0.05)}
+.code{font-weight:700;color:#67e8f9;margin-right:7px}
+.chipP{display:inline-block;font-size:9.5px;font-family:'IBM Plex Sans Thai';border-radius:9px;padding:1px 7px;border:1px solid;margin-left:3px}
+.hubs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.hub{padding:9px 16px;display:flex;align-items:center;gap:10px}
+.hub b{font-family:'JetBrains Mono';font-size:15px}
+.foot{font-size:10px;color:#48596e;margin-top:14px;text-align:center}
+</style>
+</head>
+<body>
+<div class="top">
+  <div><h1>Dashboard ภาพรวมระบบจ่ายคลอรีนปลายสาย</h1><div class="sub">All-station overview • MWA Water Quality</div></div>
+  <div class="nav">
+    <a href="frc_deckgl.html">🗺 แผนที่</a>
+    <a class="on" href="frc_dashboard.html">📊 Dashboard</a>
+    <a href="frc_report.html">📄 รายงาน</a>
+  </div>
+  <div class="badge"><div class="dot" id="bdot"></div><span id="badge">กำลังเชื่อมต่อ…</span></div>
+  <div class="clock" id="clock">--:--:--</div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+<div class="hubs" id="hubs"></div>
+
+<div class="grid2">
+  <div class="glass panel">
+    <div class="ptitle">FRC ขาออกทุกสถานี เทียบเกณฑ์ (mg/L)</div>
+    <div id="barchart"></div>
+  </div>
+  <div class="glass panel">
+    <div class="ptitle">Decay Rate k (/วัน) · ข้อมูล ม.ค.–มี.ค. 69</div>
+    <div id="kchart"></div>
+  </div>
+</div>
+
+<div class="glass panel">
+  <div class="ptitle">รายละเอียดรายสถานี — คลิกหัวตารางเพื่อเรียง (เริ่มต้น: FRC ออกน้อยสุดขึ้นก่อน)</div>
+  <div style="overflow-x:auto"><table id="tbl"><thead><tr>
+    <th data-k="code">สถานี</th><th data-k="frcIn">FRC เข้า</th><th data-k="frcOut">FRC ออก</th>
+    <th data-k="fis">Inlet Flow m³/h</th><th data-k="t">Retention ชม.</th><th data-k="k">k /วัน</th>
+    <th>ปั๊มดึงน้ำ inlet</th><th data-k="dose">แนะนำ(สูตร+k) L/hr</th><th data-k="wqc">ระบบ wqc L/hr</th><th>Trend FRC ออก</th>
+  </tr></thead><tbody id="tbody"></tbody></table></div>
+</div>
+
+<div class="foot">โหมด LIVE: intranet → public API → demo อัตโนมัติ · รีเฟรชทุก 60 วินาที · สูตรแนะนำ = Inlet Flow × (เป้าหมาย×e^(k·t/24) − FRC เข้า) × Factor ÷ (100×S.G.) · สมมติระดับน้ำ 4.0 ม. เมื่อไม่มี smartmap · k ของ SR ข้อมูลน้อย</div>
+
+<script>
+var API="http://172.16.196.100:3000/api",REFRESH=60;
+var HUB_API="https://twqonline.mwa.co.th/TWQMSServicepublic/api/mwaonmobile/getStations";
+var PUB_MAP={SW01:"18",SW02:"9",SW03:"17",SW04:"14",SW05:"20",SW06:"15",SW07:"19",SW08:"5",SW09:"4",SW10:"16"};
+var HUB_MAP={SP01:"TR1",SP02:"TR2",SP03:"TR3",SP11:"MTR"};
+var HUB_NAME={MTR:"มหาสวัสดิ์",TR1:"บางเขน 1",TR2:"บางเขน 2",TR3:"บางเขน 3"};
+var META={
+  "4":{code:"PK",name:"เพชรเกษม",area:10500,flow:12000,k:0.451},
+  "16":{code:"TP",name:"ท่าพระ",area:8120,flow:10000,k:0.44},
+  "5":{code:"RB",name:"ราษฎร์บูรณะ",area:10025,flow:14000,k:0.094},
+  "18":{code:"LP",name:"ลุมพินี",area:8570,flow:12000,k:null},
+  "9":{code:"LA",name:"ลาดพร้าว",area:13815,flow:16000,k:0.454},
+  "17":{code:"KT",name:"คลองเตย",area:8120,flow:9000,k:0.316},
+  "14":{code:"SR",name:"สำโรง",area:14081,flow:20000,k:2.652},
+  "20":{code:"MB",name:"มีนบุรี",area:9000,flow:16000,k:0.833},
+  "15":{code:"LK",name:"ลาดกระบัง",area:9000,flow:10000,k:0.047},
+  "19":{code:"BP",name:"บางพลี",area:11000,flow:22000,k:null}
+};
+var MOCK={"4":[1.44,1.36],"16":[1.30,1.18],"5":[1.42,1.34],"9":[1.18,1.22],"18":[null,0.87],"17":[0.90,0.93],"14":[0.13,1.05],"20":[1.04,1.39],"15":[0.73,1.20],"19":[0.38,1.11]};
+var IDS=Object.keys(META);
+var S={st:{},hubs:{},hist:{},sortK:"frcOut",sortAsc:true,mode:""};
+
+function fT(u,ms){return Promise.race([fetch(u,{cache:"no-store"}),new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"));},ms||8000);})]);}
+function frcC(v){if(v==null)return "#8fb3cc";return v>=0.8?"#22d3ee":(v>=0.5?"#fbbf24":"#f87171");}
+function esc(s){return String(s==null?"":s);}
+
+function calcDose(s){
+  var q=(s.fis!=null?s.fis:s.flow);
+  var fin=(s.frcIn!=null&&s.frcIn>0)?s.frcIn:null;
+  if(q==null||fin==null)return null;
+  var P=s.chl||{};
+  var tg=isFinite(P.target)?P.target:1.0,fa=isFinite(P.factor)?P.factor:0.89,sg=isFinite(P.sg)?P.sg:1.2;
+  var k=(s.k!=null?s.k:0),t=(s.t!=null?s.t:0);
+  var d=q*(tg*Math.exp(k/24*t)-fin)*fa/(100*sg);
+  return d<0?0:d;
+}
+
+function loadIntranet(){
+  var ok=0;
+  var ps=IDS.map(function(id){
+    return fT(API+"/station/"+id,7000).then(function(r){return r.json();}).then(function(j){
+      var sc=(j.data&&j.data.scada&&j.data.scada[0])||{};
+      if(sc.Chlorine==null)return;
+      ok++;
+      var m=META[id];
+      var fi=(sc.FREE_CL_INLET!=null&&sc.FREE_CL_INLET>0)?sc.FREE_CL_INLET/100:null;
+      S.st[id]={id:id,code:m.code,name:m.name,flow:m.flow,area:m.area,k:m.k,
+        frcIn:fi,frcOut:sc.Chlorine,fis:sc.FLOW_INLET_STATION,
+        p1:sc.PUMP1_STS,p2:sc.PUMP2_STS,dt:sc.LogDateTime,
+        t:(4*m.area)/m.flow};
+      pushHist(id,sc.Chlorine);
+    }).catch(function(){});
+  });
+  // พารามิเตอร์สูตรรายสถานี
+  var ps2=IDS.map(function(id){
+    return fT(API+"/chlorine/"+id,7000).then(function(r){return r.json();}).then(function(j){
+      var c=j&&j.data;if(!c)return;
+      if(!S.st[id])return;
+      S.st[id].chl={target:parseFloat(c.frc),factor:parseFloat(c.factor),sg:parseFloat(c.sg),reco:parseFloat(c.chlorine)};
+    }).catch(function(){});
+  });
+  return Promise.all(ps.concat(ps2)).then(function(){if(!ok)throw 0;S.mode="LIVE · INTRANET";});
+}
+function loadPublic(){
+  return fT(HUB_API,9000).then(function(r){return r.json();}).then(function(list){
+    var got=0;
+    list.forEach(function(st){
+      var v=st.value||{};
+      var hid=HUB_MAP[st.stationCode];
+      if(hid){var f=parseFloat(v.frc_2);if(!isNaN(f))S.hubs[hid]=f;return;}
+      var id=PUB_MAP[st.stationCode];if(!id)return;
+      var fo=parseFloat(v.frc_2);if(isNaN(fo))return;
+      got++;var m=META[id];
+      if(!S.st[id]){
+        S.st[id]={id:id,code:m.code,name:m.name,flow:m.flow,area:m.area,k:m.k,
+          frcIn:null,frcOut:fo,fis:null,p1:null,p2:null,dt:st.sourceDtm,t:(4*m.area)/m.flow};
+        pushHist(id,fo);
+      }
+    });
+    if(!Object.keys(S.st).length&&!got)throw 0;
+    if(S.mode!=="LIVE · INTRANET")S.mode="LIVE · PUBLIC API";
+  });
+}
+function loadMock(){
+  IDS.forEach(function(id){
+    if(S.st[id])return;
+    var m=META[id],mk=MOCK[id];
+    S.st[id]={id:id,code:m.code,name:m.name,flow:m.flow,area:m.area,k:m.k,
+      frcIn:mk[0],frcOut:mk[1]+(Math.random()-0.5)*0.04,fis:null,p1:0,p2:0,
+      dt:new Date().toLocaleString("th-TH"),t:(4*m.area)/m.flow};
+    pushHist(id,S.st[id].frcOut);
+  });
+  if(!S.mode)S.mode="DEMO MODE";
+}
+function pushHist(id,v){
+  if(v==null)return;
+  if(!S.hist[id])S.hist[id]=[];
+  var h=S.hist[id];
+  if(h.length&&Math.abs(h[h.length-1]-v)<1e-9)return;
+  h.push(v);if(h.length>60)h.shift();
+}
+function loadData(){
+  loadIntranet().catch(function(){return loadPublic();}).catch(function(){}).then(function(){
+    return loadPublic().catch(function(){});
+  }).then(function(){loadMock();renderAll();});
+}
+
+function renderAll(){
+  document.getElementById("badge").textContent=S.mode;
+  var arr=IDS.map(function(id){return S.st[id];}).filter(Boolean);
+  arr.forEach(function(s){s.dose=calcDose(s);s.wqc=(s.chl&&isFinite(s.chl.reco))?Math.max(0,s.chl.reco):null;});
+  // KPI
+  var pass=arr.filter(function(s){return s.frcOut>=0.8;}).length;
+  var warn=arr.filter(function(s){return s.frcOut>=0.5&&s.frcOut<0.8;}).length;
+  var low=arr.filter(function(s){return s.frcOut!=null&&s.frcOut<0.5;}).length;
+  var avg=arr.reduce(function(a,s){return a+(s.frcOut||0);},0)/Math.max(1,arr.length);
+  var pumps=arr.filter(function(s){return s.p1===1||s.p2===1;}).length;
+  var mn=arr.reduce(function(a,s){return s.frcOut!=null&&s.frcOut<a.v?{v:s.frcOut,c:s.code}:a;},{v:99,c:"—"});
+  var K=[["ผ่านเกณฑ์ ≥0.8",pass,"#22d3ee"],["เฝ้าระวัง 0.5–0.8",warn,"#fbbf24"],["ต่ำกว่าเกณฑ์ <0.5",low,low>0?"#f87171":"#48596e"],
+    ["FRC ออกเฉลี่ย",avg.toFixed(2),"#67e8f9"],["ต่ำสุด "+mn.c,(mn.v<99?mn.v.toFixed(2):"—"),frcC(mn.v<99?mn.v:null)],["ปั๊มดึงน้ำ inlet ทำงาน",pumps,"#4ade80"]];
+  document.getElementById("kpis").innerHTML=K.map(function(x){
+    return '<div class="glass kpi"><div class="v" style="color:'+x[2]+'">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>';}).join("");
+  // hubs
+  document.getElementById("hubs").innerHTML=["MTR","TR1","TR2","TR3"].map(function(h){
+    var v=S.hubs[h];
+    return '<div class="glass hub"><span style="font-size:11px;color:#7d93ab">สูบส่ง'+HUB_NAME[h]+' <span style="color:#67e8f9;font-weight:700">'+h+'</span></span><b style="color:'+frcC(v)+'">'+(v!=null?v.toFixed(2):"—")+'</b><span style="font-size:9px;color:#48596e">mg/L</span></div>';}).join("");
+  renderBars(arr);renderK(arr);renderTable(arr);
+}
+
+function renderBars(arr){
+  var a=arr.slice().sort(function(x,y){return (x.frcOut||0)-(y.frcOut||0);});
+  var W=560,rowH=26,H=a.length*rowH+26,mx=1.8;
+  var sx=function(v){return 90+(W-110)*Math.min(v,mx)/mx;};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;font-family:JetBrains Mono,monospace">';
+  [[0.5,"#f87171"],[0.8,"#fbbf24"]].forEach(function(th){
+    s+='<line x1="'+sx(th[0])+'" y1="4" x2="'+sx(th[0])+'" y2="'+(H-20)+'" stroke="'+th[1]+'" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.7"/>';
+    s+='<text x="'+sx(th[0])+'" y="'+(H-6)+'" text-anchor="middle" font-size="10" fill="'+th[1]+'">'+th[0]+'</text>';
+  });
+  a.forEach(function(st,i){
+    var y=8+i*rowH,c=frcC(st.frcOut);
+    s+='<text x="6" y="'+(y+13)+'" font-size="12" font-weight="700" fill="#67e8f9">'+st.code+'</text>';
+    s+='<rect x="90" y="'+y+'" width="'+(W-110)+'" height="17" rx="8" fill="#141f33"/>';
+    if(st.frcOut!=null){
+      s+='<rect x="90" y="'+y+'" width="'+Math.max(2,sx(st.frcOut)-90)+'" height="17" rx="8" fill="'+c+'" fill-opacity="0.75"/>';
+      s+='<text x="'+(sx(st.frcOut)+7)+'" y="'+(y+13)+'" font-size="11.5" font-weight="700" fill="'+c+'">'+st.frcOut.toFixed(2)+'</text>';
+    }
+  });
+  s+='</svg>';
+  document.getElementById("barchart").innerHTML=s;
+}
+function renderK(arr){
+  var a=arr.filter(function(s){return s.k!=null;}).sort(function(x,y){return y.k-x.k;});
+  var W=460,rowH=26,H=a.length*rowH+10,mx=2.8;
+  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;font-family:JetBrains Mono,monospace">';
+  a.forEach(function(st,i){
+    var y=6+i*rowH;
+    var c=st.k>1.0?"#f87171":(st.k>0.4?"#fbbf24":"#4ade80");
+    var w=(W-150)*Math.min(st.k,mx)/mx;
+    s+='<text x="6" y="'+(y+13)+'" font-size="12" font-weight="700" fill="#67e8f9">'+st.code+'</text>';
+    s+='<rect x="52" y="'+y+'" width="'+(W-150)+'" height="17" rx="8" fill="#141f33"/>';
+    s+='<rect x="52" y="'+y+'" width="'+Math.max(2,w)+'" height="17" rx="8" fill="'+c+'" fill-opacity="0.8"/>';
+    s+='<text x="'+(W-90)+'" y="'+(y+13)+'" font-size="11.5" font-weight="700" fill="'+c+'">'+st.k.toFixed(3)+(st.code==="SR"?" *":"")+'</text>';
+  });
+  s+='</svg><div style="font-size:9.5px;color:#48596e;margin-top:5px">* SR ข้อมูลน้อย · LP/BP ไม่มีค่า k ที่เชื่อถือได้</div>';
+  document.getElementById("kchart").innerHTML=s;
+}
+function spark(id){
+  var h=S.hist[id]||[];
+  if(h.length<2)return '<span style="font-size:9px;color:#48596e;font-family:IBM Plex Sans Thai">รอสะสม</span>';
+  var W=96,H=22,mn=Math.min.apply(null,h),mxv=Math.max.apply(null,h),rg=Math.max(0.05,mxv-mn);
+  var pts=h.map(function(v,i){return (i*(W-4)/(h.length-1)+2)+","+(H-3-(v-mn)/rg*(H-6));}).join(" ");
+  var c=frcC(h[h.length-1]);
+  return '<svg width="'+W+'" height="'+H+'"><polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="1.6"/><circle cx="'+(W-2)+'" cy="'+(H-3-(h[h.length-1]-mn)/rg*(H-6))+'" r="2.4" fill="'+c+'"/></svg>';
+}
+function chip(n,v){
+  if(v==null)return '<span class="chipP" style="color:#8fb3cc;border-color:#2b4159">'+n+' —</span>';
+  return v===1?'<span class="chipP" style="color:#4ade80;border-color:#1d5c40;background:#0f2b22">'+n+' ทำงาน</span>'
+             :'<span class="chipP" style="color:#8fb3cc;border-color:#2b4159">'+n+' หยุด</span>';
+}
+function renderTable(arr){
+  var k=S.sortK,asc=S.sortAsc;
+  var a=arr.slice().sort(function(x,y){
+    var xv=x[k],yv=y[k];
+    if(k==="code")return asc?String(xv).localeCompare(yv):String(yv).localeCompare(xv);
+    xv=(xv==null?(asc?1e12:-1e12):xv);yv=(yv==null?(asc?1e12:-1e12):yv);
+    return asc?xv-yv:yv-xv;
+  });
+  document.getElementById("tbody").innerHTML=a.map(function(s){
+    return '<tr>'
+    +'<td class="name"><span class="code">'+s.code+'</span>'+esc(s.name)+'</td>'
+    +'<td style="color:#67e8f9">'+(s.frcIn!=null?s.frcIn.toFixed(2):"—")+'</td>'
+    +'<td style="color:'+frcC(s.frcOut)+';font-weight:700">'+(s.frcOut!=null?s.frcOut.toFixed(2):"—")+'</td>'
+    +'<td>'+(s.fis!=null?Math.round(s.fis).toLocaleString():"—")+'</td>'
+    +'<td>'+(s.t!=null?s.t.toFixed(1):"—")+'</td>'
+    +'<td style="color:'+(s.k==null?"#48596e":(s.k>1?"#f87171":(s.k>0.4?"#fbbf24":"#4ade80")))+'">'+(s.k!=null?s.k.toFixed(3):"—")+'</td>'
+    +'<td>'+chip("P1",s.p1)+chip("P2",s.p2)+'</td>'
+    +'<td style="color:#7dd3fc;font-weight:700">'+(s.dose!=null?s.dose.toFixed(1):"—")+'</td>'
+    +'<td style="color:#9db8e8">'+(s.wqc!=null?s.wqc.toFixed(1):"—")+'</td>'
+    +'<td>'+spark(s.id)+'</td>'
+    +'</tr>';
+  }).join("");
+}
+document.querySelectorAll("th[data-k]").forEach(function(th){
+  th.addEventListener("click",function(){
+    var k=th.getAttribute("data-k");
+    if(S.sortK===k)S.sortAsc=!S.sortAsc;else{S.sortK=k;S.sortAsc=true;}
+    renderAll();
+  });
+});
+function tick(){document.getElementById("clock").textContent=new Date().toLocaleTimeString("th-TH",{hour12:false});}
+setInterval(tick,1000);tick();
+loadData();
+setInterval(loadData,REFRESH*1000);
+</script>
+</body>
+</html>
