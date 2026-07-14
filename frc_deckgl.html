@@ -306,6 +306,10 @@ map.addControl(overlay);
 
 
 function hexOf(c){return "#"+c.map(function(v){return ("0"+v.toString(16)).slice(-2);}).join("");}
+// ความคมชัด: rasterize SVG ที่ขนาดพิกเซลจริงบนจอ (getSize x devicePixelRatio) = วาด 1:1 ไม่ย่อไม่ขยาย
+var DPR=Math.max(1,Math.min(window.devicePixelRatio||1,3));
+window.addEventListener("resize",function(){DPR=Math.max(1,Math.min(window.devicePixelRatio||1,3));});
+function icDim(vw,vh,anchorV,disp){var sc=disp*DPR/vh;return{w:Math.round(vw*sc),h:Math.round(vh*sc),a:Math.round(anchorV*sc)};}
 // การ์ดข้อมูลกะทัดรัด + ถังกว้างเตี้ยขนาดเท่ากันทุกสถานี ฐานปักพื้น + ป้ายระดับที่ผิวน้ำ
 function tankIconURL(d){
   var dark=S.theme==="dark";
@@ -328,7 +332,8 @@ function tankIconURL(d){
   var f=Math.max(0.08,Math.min((d.level||0)/(d.maxLv||6),1));
   var wf=botF-f*hgt;
   var P=function(x,y){return x+","+y;};
-  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="352" height="284" viewBox="0 0 176 142">'
+  var _m=icDim(176,142,132,102);
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+_m.w+'" height="'+_m.h+'" viewBox="0 0 176 142">'
     +'<rect x="4" y="4" width="168" height="58" rx="9" fill="'+cardBg+'" fill-opacity="0.94" stroke="'+(byp?bypC:(sel?lite:col))+'" stroke-width="'+(sel?"2.4":"1.2")+'"/>'
     +'<line x1="13" y1="4" x2="38" y2="4" stroke="'+lite+'" stroke-width="2.5"/>'
     +'<circle cx="16" cy="18" r="4" fill="'+col+'"/>'
@@ -371,7 +376,8 @@ function hubIconURL(d){
     posts+='<line x1="'+px+'" y1="'+(cy-9)+'" x2="'+px+'" y2="'+(cy-14)+'" stroke="'+lite+'" stroke-width="1"/>';
   });
   var frcTxt=(d.frc!=null)?'<text x="60" y="100" text-anchor="middle" font-family="monospace" font-size="12" font-weight="700" fill="'+lite+'" stroke="'+halo+'" stroke-width="3" paint-order="stroke">'+d.frc.toFixed(2)+' mg/L</text>':'';
-  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="240" height="212" viewBox="0 0 120 106">'
+  var _m=icDim(120,106,84,78);
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+_m.w+'" height="'+_m.h+'" viewBox="0 0 120 106">'
     +'<text x="60" y="14" text-anchor="middle" font-family="monospace" font-size="14.5" font-weight="700" fill="'+lite+'" stroke="'+halo+'" stroke-width="3.4" paint-order="stroke">'+d.code+'</text>'
     +'<ellipse cx="60" cy="84" rx="'+(rx+7)+'" ry="5" fill="#000" opacity="'+(dark?"0.4":"0.15")+'"/>'
     +'<path d="M'+(cx-rx)+' '+cy+' L'+(cx-rx)+' '+(cy+wall)+' A'+rx+' '+ry+' 0 0 0 '+(cx+rx)+' '+(cy+wall)+' L'+(cx+rx)+' '+cy+'" fill="'+wallF+'" stroke="'+col+'" stroke-width="1.2"/>'
@@ -394,7 +400,8 @@ function plantIconURL(d){
   var lite=dark?"#7dd3fc":"#0369a1";
   var cardBg=dark?"#0a1526":"#ffffff";
   var nameC=dark?"#e2eefc":"#0f2740";
-  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="380" height="128" viewBox="0 0 190 64">'
+  var _m=icDim(190,64,60,60);
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+_m.w+'" height="'+_m.h+'" viewBox="0 0 190 64">'
     +'<rect x="4" y="4" width="182" height="32" rx="8" fill="'+cardBg+'" fill-opacity="0.94" stroke="'+col+'" stroke-width="1.2"/>'
     +'<line x1="12" y1="4" x2="36" y2="4" stroke="'+lite+'" stroke-width="2.5"/>'
     +'<circle cx="16" cy="20" r="4" fill="'+col+'"/>'
@@ -451,24 +458,24 @@ function buildLayers(){
     getLineColor:d=>frcColor(d.frcOut,d.hasBooster).concat([Math.round(160*(1-pulse))]),
     stroked:true,lineWidthMinPixels:1.5,filled:true,
     updateTriggers:{getRadius:[pulse,S.selectedId],getFillColor:[pulse],getLineColor:[pulse]}}));
-  var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId;
+  var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId+"|"+DPR;
   L.push(new deck.IconLayer({id:"tank-icons",data:arr,pickable:true,billboard:true,
     getPosition:d=>d.coord,
-    getIcon:function(d){return {url:tankIconURL(d),width:352,height:284,anchorY:264};},
+    getIcon:function(d){var m=icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
     getSize:102,sizeUnits:"pixels",
     updateTriggers:{getIcon:[iconSig]}}));
   // Hub สูบส่ง — ถังตกตะกอน (แบบ C)
   L.push(new deck.IconLayer({id:"hubs",data:HUBS,pickable:true,billboard:true,
     getPosition:d=>d.coord,
-    getIcon:function(d){return {url:hubIconURL(d),width:240,height:212,anchorY:168};},
+    getIcon:function(d){var m=icDim(120,106,84,78);return {url:hubIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
     getSize:78,sizeUnits:"pixels",
-    updateTriggers:{getIcon:[S.theme,HUBS.map(function(h){return h.frc;}).join()]}}));
+    updateTriggers:{getIcon:[S.theme,DPR,HUBS.map(function(h){return h.frc;}).join()]}}));
   // ป้าย tag โรงงานผลิตน้ำ (การ์ดสไตล์เดียวกับสถานี)
   L.push(new deck.IconLayer({id:"plant-tags",data:SOURCES,pickable:true,billboard:true,
     getPosition:d=>d.coord,
-    getIcon:function(d){return {url:plantIconURL(d),width:380,height:128,anchorY:120};},
+    getIcon:function(d){var m=icDim(190,64,60,60);return {url:plantIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
     getSize:60,sizeUnits:"pixels",
-    updateTriggers:{getIcon:[S.theme]}}));
+    updateTriggers:{getIcon:[S.theme,DPR]}}));
   overlay.setProps({layers:L});
 }
 
