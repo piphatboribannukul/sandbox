@@ -720,6 +720,10 @@ function ensureDetailDom(){
 function openDetail(id){
   ensureDetailDom();
   S.detailOpen=id;
+  if(!S.dose||S.dose.src!==id){
+    S.dose={target:null,factor:null,sg:null,frcin:null,k:null,t:null,q:null,auto:(S.dose&&S.dose.auto===false)?false:true,src:id};
+    S.doseTouched=false;
+  }
   renderDetail(id);
   fbLoadDose(id);
   loadChlorineInfo(id);
@@ -751,6 +755,7 @@ function fbSaveDose(){
   var id=S.detailOpen;if(!id)return;
   var el=document.getElementById("dpSaveMsg");
   if(!FB){if(el)el.textContent="ยังไม่ตั้งค่า Firebase (วาง FB_CONFIG ในโค้ด)";return;}
+  S.doseTouched=true;
   window.dpCalc();
   var rec=Object.assign({},S.dose,{updatedAt:new Date().toISOString()});
   var doSet=function(){
@@ -768,6 +773,7 @@ function fbLoadDose(id){
   FB.ref("frcTwin/dose/"+id).once("value").then(function(snap){
     var v=snap.val();if(!v)return;
     S.fbSaved[id]=true;
+    S.doseTouched=true;
     S.dose=Object.assign({},v,{src:id});
     if(S.detailOpen===id)renderDetail(id);
   }).catch(function(){});
@@ -782,9 +788,7 @@ function loadChlorineInfo(id){
   tryF("/chlorine/"+id).then(function(j){
     var c=j&&j.data;var st=S.stations[id];if(!c||!st)return;
     st.chl={target:parseFloat(c.frc),factor:parseFloat(c.factor),sg:parseFloat(c.sg),frcInlet:parseFloat(c.frcInlet),reco:parseFloat(c.chlorine),dt:c.updatedAt};
-    if(S.dose&&S.dose.src!==id&&!S.fbSaved[id]){
-      S.dose={target:st.chl.target,factor:st.chl.factor,sg:st.chl.sg,frcin:null,k:null,t:null,q:null,src:id};
-    }
+    // ค่า default จาก chl ถูกหยิบใน renderDetail (เฉพาะช่องที่ผู้ใช้ยังไม่แตะ)
     if(S.detailOpen===id)renderDetail(id);
   }).catch(function(){});
   // ถังคลอรีน (โครง JSON ยังไม่ยืนยัน — parser ยืดหยุ่น + log)
@@ -811,7 +815,9 @@ window.dpCalc=function(){
   var ie=document.getElementById("dpI");
   var fi=(ie&&ie.value!=="")?parseFloat(ie.value):null;
   var _au=document.getElementById("dpAuto");var autoV=_au?_au.checked:true;
-  S.dose={target:t,factor:fa,sg:sg,frcin:autoV?null:fi,k:isFinite(kd)?kd:null,t:isFinite(rt)?rt:null,q:autoV?null:(isFinite(q)?q:null),auto:autoV,src:S.detailOpen};
+  if(S.doseTouched){
+    S.dose={target:t,factor:fa,sg:sg,frcin:autoV?null:fi,k:isFinite(kd)?kd:null,t:autoV?null:(isFinite(rt)?rt:null),q:autoV?null:(isFinite(q)?q:null),auto:autoV,src:S.detailOpen};
+  }else if(S.dose){S.dose.auto=autoV;}
   if(!isFinite(kd))kd=0;if(!isFinite(rt))rt=0;
   if(!isFinite(q))q=(s.qin!=null?s.qin:(s.fis!=null?s.fis:(s.flow||null)));
   var fin=(fi!=null&&isFinite(fi))?fi:((s.frcIn!=null&&s.frcIn>0)?s.frcIn:null);
@@ -825,8 +831,9 @@ window.dpCalc=function(){
   var d=q*(creq-fin)*fa/(100*sg);if(d<0)d=0;
   el.textContent=d.toFixed(1);
 };
-window.dpKpick=function(v){var e=document.getElementById("dpK");if(v!=="c"&&e)e.value=v;window.dpCalc();};
-window.dpAutoToggle=function(v){if(S.dose)S.dose.auto=v;renderDetail(S.detailOpen);};
+window.dpKpick=function(v){S.doseTouched=true;var e=document.getElementById("dpK");if(v!=="c"&&e)e.value=v;window.dpCalc();};
+window.dpAutoToggle=function(v){S.doseTouched=true;if(S.dose)S.dose.auto=v;renderDetail(S.detailOpen);};
+window.dpTouch=function(){S.doseTouched=true;};
 function renderDetail(id){
   var s=S.stations[id];
   var el=document.getElementById("dpInner");
@@ -1003,18 +1010,26 @@ function renderDetail(id){
 
   // ---------- สูตรคำนวณด้านล่าง ----------
   var D=S.dose||{};
+  var C=s.chl||{};
+  var dpTv=(D.target!=null&&isFinite(D.target))?D.target:(isFinite(C.target)?C.target:1.00);
+  var dpFv=(D.factor!=null&&isFinite(D.factor))?D.factor:(isFinite(C.factor)?C.factor:0.89);
+  var dpGv=(D.sg!=null&&isFinite(D.sg))?D.sg:(isFinite(C.sg)?C.sg:1.20);
   var autoOn=!(D.auto===false); // เรียลไทม์เป็นค่าเริ่มต้น
   var liveI=(s.frcIn!=null&&s.frcIn>0)?+s.frcIn.toFixed(2):"";
   var liveQ=(qinN!=null?Math.round(qinN):(s.flow||""));
   var dpIv=autoOn?liveI:((D.frcin!=null&&isFinite(D.frcin))?D.frcin:liveI);
   var dpQv=autoOn?liveQ:((D.q!=null&&isFinite(D.q))?D.q:liveQ);
   var dpKv=(D.k!=null&&isFinite(D.k))?D.k:(s.k!=null?s.k:"");
-  var dpRv=(D.t!=null&&isFinite(D.t))?D.t:(byp?0:(s.t!=null?+(+s.t).toFixed(1):""));
+  var liveR=(byp?0:(s.t!=null?+(+s.t).toFixed(1):""));
+  var dpRv=autoOn?liveR:((D.t!=null&&isFinite(D.t))?D.t:liveR);
   var roA=autoOn?' readonly style="opacity:0.85;border-color:#1d5c40"':'';
   var lvTag=autoOn?' <span style="color:#4ade80;font-size:9px">●สด</span>':'';
-  var kopts='<option value="'+(s.k!=null?s.k:0)+'" selected>'+s.code+' — สถานีนี้ ('+(s.k!=null?s.k:"ไม่มีค่า k")+')</option>';
-  IDS.forEach(function(id2){var m2=META[id2];if(m2.k!=null&&m2.code!==s.code)kopts+='<option value="'+m2.k+'">'+m2.code+' '+m2.k+(m2.code==="SR"?" (ข้อมูลน้อย)":"")+'</option>';});
-  kopts+='<option value="0">0 — ไม่ชดเชย decay</option><option value="c">กำหนดเอง</option>';
+  var kSel=String(dpKv);
+  var kop=function(val,label){return '<option value="'+val+'"'+(String(val)===kSel?" selected":"")+'>'+label+'</option>';};
+  var kopts=kop(s.k!=null?s.k:0,s.code+' — สถานีนี้ ('+(s.k!=null?s.k:"ไม่มีค่า k")+')');
+  IDS.forEach(function(id2){var m2=META[id2];if(m2.k!=null&&m2.code!==s.code)kopts+=kop(m2.k,m2.code+' '+m2.k+(m2.code==="SR"?" (ข้อมูลน้อย)":""));});
+  kopts+=kop(0,"0 — ไม่ชดเชย decay");
+  kopts+='<option value="c"'+(kopts.indexOf(" selected")<0?" selected":"")+'>กำหนดเอง</option>';
   el.innerHTML=
     '<div class="dp-head">'
     +'<button class="dp-back" onclick="closeDetail()">← กลับแผนที่</button>'
@@ -1040,16 +1055,16 @@ function renderDetail(id){
     +'<div class="dp-card" style="flex:1.7;border-color:#7a3d47;background:linear-gradient(180deg,rgba(127,29,29,0.16),rgba(14,26,44,0.6))">'
       +'<div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:8px 10px;align-items:center;flex:1">'
       +'<label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:11.5px;color:#a7f3d0;cursor:pointer;padding-bottom:2px;border-bottom:1px dashed rgba(122,61,71,0.5)"><input type="checkbox" id="dpAuto" '+(autoOn?"checked":"")+' onchange="dpAutoToggle(this.checked)" style="accent-color:#4ade80"> คำนวณเรียลไทม์ — Inlet Flow + FRC inlet จากเซ็นเซอร์ (อัปเดตทุก 60 วิ)</label>' 
-      +'<span style="font-size:11.5px;color:#e8b4b8">FRC เป้าหมาย</span><input id="dpT" class="dp-in" type="number" step="0.05" oninput="dpCalc()" value="'+(isFinite(D.target)?D.target:1.00)+'">'
-      +'<span style="font-size:11.5px;color:#e8b4b8">Factor</span><input id="dpF" class="dp-in" type="number" step="0.01" oninput="dpCalc()" value="'+(isFinite(D.factor)?D.factor:0.89)+'">'
-      +'<span style="font-size:11.5px;color:#e8b4b8">S.G.</span><input id="dpG" class="dp-in" type="number" step="0.01" oninput="dpCalc()" value="'+(isFinite(D.sg)?D.sg:1.20)+'">'
-      +'<span style="font-size:11.5px;color:#e8b4b8">FRC inlet'+lvTag+'</span><input id="dpI" class="dp-in" type="number" step="0.01" oninput="dpCalc()" value="'+dpIv+'"'+roA+'>'
-      +'<span style="font-size:11.5px;color:#e8b4b8">Inlet Flow'+lvTag+'</span><input id="dpQ" class="dp-in" type="number" step="100" '+(autoOn?'style="width:92px;opacity:0.85;border-color:#1d5c40" readonly':'style="width:92px"')+' oninput="dpCalc()" value="'+dpQv+'">'
-      +'<span style="font-size:11.5px;color:#e8b4b8">Retention (ชม.)</span><input id="dpR" class="dp-in" type="number" step="0.1" oninput="dpCalc()" value="'+dpRv+'">'
+      +'<span style="font-size:11.5px;color:#e8b4b8">FRC เป้าหมาย</span><input id="dpT" class="dp-in" type="number" step="0.05" oninput="dpTouch();dpCalc()" value="'+dpTv+'">'
+      +'<span style="font-size:11.5px;color:#e8b4b8">Factor</span><input id="dpF" class="dp-in" type="number" step="0.01" oninput="dpTouch();dpCalc()" value="'+dpFv+'">'
+      +'<span style="font-size:11.5px;color:#e8b4b8">S.G.</span><input id="dpG" class="dp-in" type="number" step="0.01" oninput="dpTouch();dpCalc()" value="'+dpGv+'">'
+      +'<span style="font-size:11.5px;color:#e8b4b8">FRC inlet'+lvTag+'</span><input id="dpI" class="dp-in" type="number" step="0.01" oninput="dpTouch();dpCalc()" value="'+dpIv+'"'+roA+'>'
+      +'<span style="font-size:11.5px;color:#e8b4b8">Inlet Flow'+lvTag+'</span><input id="dpQ" class="dp-in" type="number" step="100" '+(autoOn?'style="width:92px;opacity:0.85;border-color:#1d5c40" readonly':'style="width:92px"')+' oninput="dpTouch();dpCalc()" value="'+dpQv+'">'
+      +'<span style="font-size:11.5px;color:#e8b4b8">Retention (ชม.)'+lvTag+'</span><input id="dpR" class="dp-in" type="number" step="0.1" oninput="dpTouch();dpCalc()" value="'+dpRv+'"'+roA+'>'
       +'<span style="font-size:11.5px;color:#e8b4b8">k (/วัน)</span>'
       +'<span style="grid-column:2/5;display:flex;gap:8px;align-items:center">'
         +'<select id="dpKsel" class="dp-in" style="width:auto;flex:1;text-align:left;font-size:12px" onchange="dpKpick(this.value)">'+kopts+'</select>'
-        +'<input id="dpK" class="dp-in" type="number" step="0.01" style="width:76px" oninput="dpCalc()" value="'+dpKv+'">'
+        +'<input id="dpK" class="dp-in" type="number" step="0.01" style="width:76px" oninput="dpTouch();dpCalc()" value="'+dpKv+'">'
       +'</span>'
       +'</div>'
       +'<div style="font-size:11.5px;color:#e8b4b8;margin-top:9px;text-align:center">FRC ขาออกคาดการณ์ (ยังไม่เติมเสริม): <span id="dpPred" style="color:#fde68a;font-family:JetBrains Mono,monospace;font-weight:700">—</span> mg/L · วัดจริง <span style="color:#a7f3d0;font-family:JetBrains Mono,monospace;font-weight:700">'+outTxt+'</span> mg/L</div>'
