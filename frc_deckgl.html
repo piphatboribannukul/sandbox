@@ -154,11 +154,11 @@ const META={
   "16":{code:"TP",name:"ท่าพระ",area:8120,maxLv:5.63,flow:10000,k:0.44,coord:[100.47622,13.731417],src:"MTR"},
   "5":{code:"RB",name:"ราษฎร์บูรณะ",area:10025,maxLv:5.6,flow:14000,k:0.094,coord:[100.467606,13.675917],src:"MTR"},
   "18":{code:"LP",name:"ลุมพินี",area:8570,maxLv:5.7,flow:12000,k:null,coord:[100.53785,13.734649],src:"TR1"},
-  "9":{code:"LA",name:"ลาดพร้าว",area:13815,maxLv:5.83,flow:16000,k:0.454,coord:[100.59763,13.766959],src:"TR2"},
-  "17":{code:"KT",name:"คลองเตย",area:8120,maxLv:5.83,flow:9000,k:0.316,coord:[100.58102,13.715186],src:"TR2"},
-  "14":{code:"SR",name:"สำโรง",area:14081,maxLv:5.83,flow:20000,k:2.652,coord:[100.59082,13.662468],src:"TR1"},
-  "20":{code:"MB",name:"มีนบุรี",area:9000,maxLv:5.5,flow:16000,k:0.833,coord:[100.74055,13.826229],src:"TR3"},
-  "15":{code:"LK",name:"ลาดกระบัง",area:9000,maxLv:5.83,flow:10000,k:0.047,coord:[100.741005,13.724753],src:"TR3"},
+  "9":{code:"LA",name:"ลาดพร้าว",area:13815,maxLv:5.63,flow:16000,k:0.454,coord:[100.59763,13.766959],src:"TR2"},
+  "17":{code:"KT",name:"คลองเตย",area:8120,maxLv:5.63,flow:9000,k:0.316,coord:[100.58102,13.715186],src:"TR2"},
+  "14":{code:"SR",name:"สำโรง",area:14081,maxLv:5.63,flow:20000,k:2.652,coord:[100.59082,13.662468],src:"TR1"},
+  "20":{code:"MB",name:"มีนบุรี",area:11961,maxLv:7.1,flow:16000,k:0.627,coord:[100.74055,13.826229],src:"TR3"},
+  "15":{code:"LK",name:"ลาดกระบัง",area:9000,maxLv:5.63,flow:10000,k:0.047,coord:[100.741005,13.724753],src:"TR3"},
   "19":{code:"BP",name:"บางพลี",area:11000,maxLv:5.9,flow:22000,k:null,coord:[100.713974,13.598997],src:"TR3"},
 };
 const IDS=Object.keys(META);
@@ -792,19 +792,25 @@ function loadChlorineInfo(id){
     if(S.detailOpen===id)renderDetail(id);
   }).catch(function(){});
   // ถังคลอรีน (โครง JSON ยังไม่ยืนยัน — parser ยืดหยุ่น + log)
-  tryF("/chlorine-tank/"+id).then(function(j){
+  fT(CHL_HOST+"/api/chlorine-tank/"+id,17000).then(function(r){
+    if(!r.ok){
+      var se=S.stations[id];
+      if(se&&!se.tank){se.tankErr="server ตอบ HTTP "+r.status+(r.status===500?" (สถานีนี้อาจยังไม่เชื่อมระบบถังคลอรีนเข้า backend)":"");if(S.detailOpen===id)renderDetail(id);}
+      return null;
+    }
+    return r.json();
+  }).then(function(j){
+    if(!j)return;
     var d=(j&&j.data)||{};var st=S.stations[id];if(!st)return;
     st.tankErr=false;
     try{console.log("chlorine-tank/"+id,JSON.stringify(d));}catch(e){}
-    var used={};
-    var pick=function(keys){
-      for(var k in d){if(used[k])continue;var lk=String(k).toLowerCase();
-        for(var x=0;x<keys.length;x++){if(lk.indexOf(keys[x])>=0){var v=parseFloat(d[k]);if(isFinite(v)){used[k]=1;return v;}}}}
-      return null;};
-    st.tank={level:pick(["level"]),volume:pick(["volume","vol"]),dose:pick(["dose","feed"]),cab:pick(["cab","inflow","flowin","water"])};
+    // mapping ยืนยัน MB 15/7/69: LEVEL(m) VOLUMP(L) FLOWRATE(=Dose rate L/hr) INLETFLOW(m3/h) timeDate
+    // DOSING ยังไม่ทราบความหมายแน่ชัด (ไม่ใช่น้ำเข้าตู้วัด) — เก็บไว้ใน tank.dosing รอตีความ
+    var nn=function(v){v=parseFloat(v);return isFinite(v)?v:null;};
+    st.tank={level:nn(d.LEVEL),volume:nn(d.VOLUMP),dose:nn(d.FLOWRATE),cab:null,dosing:nn(d.DOSING),inlet:nn(d.INLETFLOW),dt:d.timeDate||null};
     if(S.detailOpen===id)renderDetail(id);
   }).catch(function(){
-    var st=S.stations[id];if(st&&!st.tank){st.tankErr=true;if(S.detailOpen===id)renderDetail(id);}
+    var st=S.stations[id];if(st&&!st.tank){st.tankErr="เชื่อมไม่ได้ (CORS/เครือข่าย)";if(S.detailOpen===id)renderDetail(id);}
   });
 }
 
@@ -921,6 +927,8 @@ function renderDetail(id){
   w.push('<line x1="898" y1="'+wy+'" x2="912" y2="'+wy+'" stroke="#7dd3fc" stroke-width="2.2"/>');
   w.push('<text x="918" y="'+(wy+5)+'" font-size="14" font-weight="700" fill="#7dd3fc" '+mono+'>'+lv+' m</text>');
   w.push('<text x="918" y="'+(iT+2)+'" font-size="10.5" fill="#5b7089" '+mono+'>max '+(s.maxLv||"—")+'</text>');
+  var capV=(s.maxLv&&s.area)?Math.round(s.maxLv*s.area).toLocaleString():"—";
+  w.push('<text x="894" y="581" text-anchor="end" font-size="12" fill="#7d93ab" '+mono+'>ความจุถัง '+capV+' m³</text>');
 
   // ---------- ถังคลอรีน + ท่อ ----------
   var cc=110,crx=88,cry=22,ct=412,cb=558;
@@ -1005,7 +1013,7 @@ function renderDetail(id){
   // ---------- หมายเหตุ ----------
   if(byp)w.push('<text x="418" y="600" font-size="12.5" font-weight="700" fill="#fbbf24">⇄ BYPASS — น้ำวิ่งอ้อมถัง (retention ≈ 0, k ไม่มีผล)</text>');
   else w.push('<text x="418" y="600" font-size="12.5" fill="#7dd3fc">Retention time ≈ '+(s.t?s.t.toFixed(1):"—")+' ชม. · k = '+(s.k!=null?s.k:"—")+' /วัน</text>');
-  w.push('<text x="418" y="622" font-size="11" fill="#5b7089">* ข้อมูลล่าสุด '+(s.dt||"—")+(s.tank?' · ถังคลอรีน: /api/chlorine-tank (port 80)':(s.tankErr?' · เชื่อม /api/chlorine-tank ไม่ได้ — มีเฉพาะ port 80 อาจติด CORS (ดู Console)':' · ช่อง — รอเชื่อมข้อมูลตู้จ่ายคลอรีน'))+'</text>');
+  w.push('<text x="418" y="622" font-size="11" fill="#5b7089">* ข้อมูลล่าสุด '+(s.dt||"—")+(s.tank?' · ถังคลอรีน: เชื่อมแล้ว ('+(s.tank.dt||'')+')':(s.tankErr?' · ถังคลอรีน: '+s.tankErr:' · ช่อง — รอเชื่อมข้อมูลตู้จ่ายคลอรีน'))+'</text>');
   w.push('</svg>');
 
   // ---------- สูตรคำนวณด้านล่าง ----------
