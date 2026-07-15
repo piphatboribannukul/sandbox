@@ -909,21 +909,38 @@ function renderDetail(id){
   w.push('<polygon points="1028,302 1040,280 1052,302" fill="'+outC+'"/>');
   w.push('<text x="1040" y="272" text-anchor="middle" font-size="11" fill="#8fb3cc">จ่ายผู้ใช้น้ำ</text>');
 
-  // ตัวถัง
-  w.push('<rect x="418" y="548" width="480" height="14" rx="5" fill="#1d2f44" stroke="#3a5570"/>');
-  w.push('<rect x="'+gx+'" y="'+gy+'" width="'+gw+'" height="'+(gb-gy)+'" rx="4" fill="url(#dpglass)" stroke="#6ea3d8" stroke-width="2"/>');
-  w.push('<rect x="'+(gx+6)+'" y="'+wy+'" width="'+(gw-12)+'" height="'+(iB-wy+2)+'" fill="url(#dpwatR)"/>');
-  var wave='M'+(gx+6)+' '+wy;
-  for(var k2=0;k2<4;k2++)wave+=' q28 -6 56 0 q28 6 56 0';
-  w.push('<path d="'+wave+'" fill="none" stroke="#9bd7ff" stroke-width="2.2" opacity="0.85"/>');
-  w.push('<rect x="'+(gx+16)+'" y="'+(wy+10)+'" width="15" height="'+Math.max(0,iB-wy-22)+'" rx="7" fill="#cfe9ff" opacity="0.12"/>');
-  for(var mk=1;mk<4;mk++)w.push('<line x1="'+(gx+mk*gw/4)+'" y1="'+gy+'" x2="'+(gx+mk*gw/4)+'" y2="'+gb+'" stroke="#6ea3d8" stroke-opacity="0.22" stroke-width="2"/>');
-  w.push('<rect x="418" y="252" width="480" height="14" rx="5" fill="#2c4258" stroke="#6ea3d8" stroke-width="1.4"/>');
-  var bx=[520,620,720,820];
+  // ตัวถัง — MB มี 2 ถังอนุกรม (LV ใหม่ -> ถังเดิม) สถานีอื่นถังเดียว
+  var tanks=(id==="20")
+    ?[{x:430,w:150,lbl:"LV (ใหม่) · 4,216 m²"},{x:598,w:288,lbl:"ถังเดิม · 7,745 m²",main:true}]
+    :[{x:430,w:456,main:true}];
+  var lastTk=tanks[tanks.length-1];
+  tanks.forEach(function(tk2){
+    var x1=tk2.x,w2=tk2.w;
+    w.push('<rect x="'+(x1-12)+'" y="548" width="'+(w2+24)+'" height="14" rx="5" fill="#1d2f44" stroke="#3a5570"/>');
+    w.push('<rect x="'+x1+'" y="'+gy+'" width="'+w2+'" height="'+(gb-gy)+'" rx="4" fill="url(#dpglass)" stroke="#6ea3d8" stroke-width="2"/>');
+    w.push('<rect x="'+(x1+6)+'" y="'+wy+'" width="'+(w2-12)+'" height="'+(iB-wy+2)+'" fill="url(#dpwatR)"/>');
+    var seg=Math.max(2,Math.round((w2-12)/112)),segW=(w2-12)/(seg*2);
+    var wv='M'+(x1+6)+' '+wy;
+    for(var k3=0;k3<seg;k3++)wv+=' q'+(segW/2)+' -6 '+segW+' 0 q'+(segW/2)+' 6 '+segW+' 0';
+    w.push('<path d="'+wv+'" fill="none" stroke="#9bd7ff" stroke-width="2.2" opacity="0.85"/>');
+    w.push('<rect x="'+(x1+14)+'" y="'+(wy+10)+'" width="14" height="'+Math.max(0,iB-wy-22)+'" rx="7" fill="#cfe9ff" opacity="0.12"/>');
+    for(var mk=1;mk<Math.round(w2/120);mk++)w.push('<line x1="'+(x1+mk*w2/Math.round(w2/120))+'" y1="'+gy+'" x2="'+(x1+mk*w2/Math.round(w2/120))+'" y2="'+gb+'" stroke="#6ea3d8" stroke-opacity="0.22" stroke-width="2"/>');
+    w.push('<rect x="'+(x1-12)+'" y="252" width="'+(w2+24)+'" height="14" rx="5" fill="#2c4258" stroke="#6ea3d8" stroke-width="1.4"/>');
+    if(tk2.lbl)w.push('<text x="'+(x1+w2/2)+'" y="'+(gy+22)+'" text-anchor="middle" font-size="11" fill="#7ba7d9">'+tk2.lbl+'</text>');
+  });
+  // ท่อถ่ายระหว่างถัง (เฉพาะ MB) — LV -> ถังเดิม
+  if(tanks.length>1){
+    w.push('<line x1="576" y1="516" x2="602" y2="516" stroke="#4c5a68" stroke-width="10" stroke-linecap="round"/>');
+    w.push('<line x1="576" y1="516" x2="602" y2="516" class="flow" stroke="#22d3ee" stroke-width="4"/>');
+    w.push('<text x="589" y="540" text-anchor="middle" font-size="9.5" fill="#5b7089">อนุกรม</text>');
+  }
+  var bx=(tanks.length>1)?[480,660,760,840]:[520,620,720,820];
   for(var b=0;b<bx.length;b++)w.push('<circle class="bub" style="animation-delay:'+(b*0.75)+'s" cx="'+bx[b]+'" cy="'+(iB-18-(b%2)*26)+'" r="'+(3.5+(b%2))+'" fill="#dbeafe" opacity="0.5"/>');
   w.push('<rect x="548" y="216" width="220" height="28" rx="9" fill="#12253c" stroke="#2b4a6b"/>');
   w.push('<text x="658" y="235" text-anchor="middle" font-size="12.5" font-weight="700" fill="#c8dcf0">ถังเก็บน้ำใส (Clear Water Tank)</text>');
-  w.push('<text x="658" y="'+((wy+iB)/2+8)+'" text-anchor="middle" font-size="17" font-weight="700" fill="#eaf6ff" '+mono+'>'+vol+' m³</text>');
+  var volX=lastTk.x+lastTk.w/2;
+  w.push('<text x="'+volX+'" y="'+((wy+iB)/2+8)+'" text-anchor="middle" font-size="17" font-weight="700" fill="#eaf6ff" '+mono+'>'+vol+' m³</text>');
+  if(tanks.length>1)w.push('<text x="'+volX+'" y="'+((wy+iB)/2+26)+'" text-anchor="middle" font-size="9.5" fill="#7ba7d9">(รวม 2 ถัง · smartmap ไม่มีระดับ LV แยก — แสดงเท่าถังหลัก)</text>');
   w.push('<line x1="898" y1="'+wy+'" x2="912" y2="'+wy+'" stroke="#7dd3fc" stroke-width="2.2"/>');
   w.push('<text x="918" y="'+(wy+5)+'" font-size="14" font-weight="700" fill="#7dd3fc" '+mono+'>'+lv+' m</text>');
   w.push('<text x="918" y="'+(iT+2)+'" font-size="10.5" fill="#5b7089" '+mono+'>max '+(s.maxLv||"—")+'</text>');
