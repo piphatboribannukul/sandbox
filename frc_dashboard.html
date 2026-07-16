@@ -125,7 +125,9 @@ function calcDose(s){
 function loadIntranet(){
   var ok=0;
   var ps=IDS.map(function(id){
-    return fT(API+"/station/"+id,7000).then(function(r){return r.json();}).then(function(j){
+    return fT(API+"/station/"+id,7000).then(function(r){if(!r.ok)throw 0;return r.json();})
+      .catch(function(){return fT("http://172.16.196.100/api/station/"+id,8000).then(function(r){if(!r.ok)throw 0;return r.json();});})
+      .then(function(j){
       var sc=(j.data&&j.data.scada&&j.data.scada[0])||{};
       if(sc.Chlorine==null)return;
       ok++;
@@ -140,7 +142,9 @@ function loadIntranet(){
   });
   // พารามิเตอร์สูตรรายสถานี
   var ps2=IDS.map(function(id){
-    return fT(API+"/chlorine/"+id,7000).then(function(r){return r.json();}).then(function(j){
+    return fT(API+"/chlorine/"+id,7000).then(function(r){if(!r.ok)throw 0;return r.json();})
+      .catch(function(){return fT("http://172.16.196.100/api/chlorine/"+id,8000).then(function(r){if(!r.ok)throw 0;return r.json();});})
+      .then(function(j){
       var c=j&&j.data;if(!c)return;
       if(!S.st[id])return;
       S.st[id].chl={target:parseFloat(c.frc),factor:parseFloat(c.factor),sg:parseFloat(c.sg),reco:parseFloat(c.chlorine)};
