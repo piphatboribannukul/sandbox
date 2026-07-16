@@ -524,7 +524,9 @@ function loadPublic(){
 // หลัก: intranet API (มี In+Out+level hook)
 function loadLive(){
   var ok=0;
-  return Promise.all(IDS.map(function(id){return fT(API+"/station/"+id,6000).then(function(r){return r.json();}).then(function(d){
+  return Promise.all(IDS.map(function(id){return fT(API+"/station/"+id,6000).then(function(r){if(!r.ok)throw 0;return r.json();})
+    .catch(function(){return fT(CHL_HOST+"/api/station/"+id,8000).then(function(r){if(!r.ok)throw 0;return r.json();});})
+    .then(function(d){
     var sc=d.data&&d.data.scada&&d.data.scada[0],m=META[id];if(!sc)return;
     var frcOut=sc.Chlorine,frcIn=(sc.FREE_CL_INLET!=null&&sc.FREE_CL_INLET>0)?sc.FREE_CL_INLET/100:null;
     // Bypass: น้ำเข้าถังเก็บน้ำใส (FLOW_INLET_STATION, m3/hr) ต่ำผิดปกติ
