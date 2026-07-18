@@ -114,7 +114,7 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
   <div class="legend-item"><div class="legend-dot" style="background:#a78bfa;color:#a78bfa"></div><span>Booster Active (FRC ออก &gt; เข้า)</span></div>
   <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;color:#f59e0b"></div><span>⇄ Bypass (น้ำไม่ผ่านถัง)</span></div>
   <div class="legend-item" style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(51,65,85,0.3)"><div class="legend-line" style="background:#22c55e;color:#22c55e;height:5px"></div><span>อุโมงค์ MTR → PK TP RB</span></div>
-  <div class="legend-item"><div class="legend-line" style="background:#f97316;color:#f97316;height:5px"></div><span>อุโมงค์ TR1 → LP SR (+RB)</span></div>
+  <div class="legend-item"><div class="legend-line" style="background:#f97316;color:#f97316;height:5px"></div><span>อุโมงค์ TR1 → LP TP SR (+RB)</span></div>
   <div class="legend-item"><div class="legend-line" style="background:#eab308;color:#eab308;height:5px"></div><span>อุโมงค์ TR2 → LA KT SR (+BP)</span></div>
   <div class="legend-item"><div class="legend-line" style="background:#ec4899;color:#ec4899;height:5px"></div><span>อุโมงค์ TR3 → MB LK BP</span></div>
   <div class="legend-item"><div class="legend-line" style="background:#67e8f9;color:#67e8f9"></div><span>ขอบเขตพื้นที่บริการ กปน.</span></div>
@@ -151,7 +151,7 @@ const HUB_MAP={SP01:"TR1",SP02:"TR2",SP03:"TR3",SP11:"MTR"};
 // พิกัดตามตารางทางการ (Lat/Long)
 const META={
   "4":{code:"PK",name:"เพชรเกษม",area:10500,maxLv:6.7,flow:12000,k:0.451,coord:[100.40649,13.72472],src:"MTR"},
-  "16":{code:"TP",name:"ท่าพระ",area:8120,maxLv:5.63,flow:10000,k:0.44,coord:[100.47622,13.731417],src:"MTR"},
+  "16":{code:"TP",name:"ท่าพระ",area:8120,maxLv:5.63,flow:10000,k:0.44,coord:[100.47622,13.731417],src:"MTR/TR1"},
   "5":{code:"RB",name:"ราษฎร์บูรณะ",area:10025,maxLv:5.6,flow:14000,k:0.094,coord:[100.467606,13.675917],src:"MTR"},
   "18":{code:"LP",name:"ลุมพินี",area:8570,maxLv:5.7,flow:12000,k:null,coord:[100.53785,13.734649],src:"TR1"},
   "9":{code:"LA",name:"ลาดพร้าว",area:13815,maxLv:5.63,flow:16000,k:0.454,coord:[100.59763,13.766959],src:"TR2"},
@@ -190,6 +190,7 @@ const ROUTES2=[
   {id:"TR1-A",g:"TR1",pts:[[100.5500,13.8815],[100.55298,13.87858],[100.5512,13.8380],[100.5475,13.7980],[100.5428,13.7620],[100.5398,13.7362],[100.5440,13.7180],[100.5500,13.7050],[100.5600,13.6920],[100.5710,13.6810],[100.5830,13.6700],[100.5885,13.6645]]},
   {id:"TR1-B",g:"TR1",parent:"TR1-A",pts:[[100.5428,13.7620],[100.5220,13.7420],[100.5000,13.7180],[100.4850,13.6980],[100.4720,13.6840],[100.4690,13.6790]]},
   {id:"sp-LP",g:"TR1",parent:"TR1-A",kind:"spur",pts:[[100.5398,13.7362],[100.53785,13.734649]]},
+  {id:"TR1-C",g:"TR1",parent:"TR1-A",pts:[[100.5398,13.7362],[100.5220,13.7335],[100.5050,13.7315],[100.4900,13.7300],[100.47622,13.731417]]},
   {id:"sp-SR1",g:"TR1",parent:"TR1-A",kind:"spur",pts:[[100.5885,13.6645],[100.59082,13.662468]]},
   {id:"sp-RB2",g:"TR1",parent:"TR1-B",kind:"spur",pts:[[100.4690,13.6790],[100.467606,13.675917]]},
   // ===== TR2 (ส้มอ่อน) =====
@@ -623,7 +624,7 @@ function renderInfo(){
   var s=S.stations[S.selectedId]||META[S.selectedId];
   var panel=document.getElementById("infoPanel");panel.classList.add("show");
   var kd=s.kHist,canCalc=kd&&kd>0;
-  var srcName={MTR:"สูบส่งมหาสวัสดิ์ (MTR)",TR1:"สูบส่งบางเขน 1 (TR1)",TR2:"สูบส่งบางเขน 2 (TR2)",TR3:"สูบส่งบางเขน 3 (TR3)"}[s.src]||"—";
+  var srcName={MTR:"สูบส่งมหาสวัสดิ์ (MTR)",TR1:"สูบส่งบางเขน 1 (TR1)",TR2:"สูบส่งบางเขน 2 (TR2)",TR3:"สูบส่งบางเขน 3 (TR3)"}[s.src]||s.src||"—";
   var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
     '<div class="stat-row"><span class="stat-label">เติมคลอรีนเสริม (จาก FRC)</span><span class="stat-value mono" style="color:'+(s.dosing?"#a78bfa":"#7d93ab")+'">'+(s.dosing?"มี (Booster)":"ไม่มี")+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">ปั๊มดึงน้ำเข้าเครื่องวัด</span><span class="stat-value mono">P1 '+(s.p1===1?"✓":(s.p1===0?"✗":"—"))+' · P2 '+(s.p2===1?"✓":(s.p2===0?"✗":"—"))+'</span></div>'+
@@ -913,7 +914,7 @@ function renderDetail(id){
 
   // ตัวถัง — MB มี 2 ถังอนุกรม (LV ใหม่ -> ถังเดิม) สถานีอื่นถังเดียว
   var tanks=(id==="20")
-    ?[{x:430,w:150,lbl:"LV (ใหม่) · 4,216 m²"},{x:598,w:288,lbl:"ถังเดิม · 7,745 m²",main:true}]
+    ?[{x:430,w:288,lbl:"ถังใหญ่ · 7,745 m²"},{x:736,w:150,lbl:"LV · 4,216 m²",main:true}]
     :[{x:430,w:456,main:true}];
   var lastTk=tanks[tanks.length-1];
   tanks.forEach(function(tk2){
@@ -932,15 +933,16 @@ function renderDetail(id){
   });
   // ท่อถ่ายระหว่างถัง (เฉพาะ MB) — LV -> ถังเดิม
   if(tanks.length>1){
-    w.push('<line x1="576" y1="516" x2="602" y2="516" stroke="#4c5a68" stroke-width="10" stroke-linecap="round"/>');
-    w.push('<line x1="576" y1="516" x2="602" y2="516" class="flow" stroke="#22d3ee" stroke-width="4"/>');
-    w.push('<text x="589" y="540" text-anchor="middle" font-size="9.5" fill="#5b7089">อนุกรม</text>');
+    w.push('<line x1="714" y1="516" x2="740" y2="516" stroke="#4c5a68" stroke-width="10" stroke-linecap="round"/>');
+    w.push('<line x1="714" y1="516" x2="740" y2="516" class="flow" stroke="#22d3ee" stroke-width="4"/>');
+    w.push('<text x="727" y="540" text-anchor="middle" font-size="9.5" fill="#5b7089">อนุกรม</text>');
   }
   var bx=(tanks.length>1)?[480,660,760,840]:[520,620,720,820];
   for(var b=0;b<bx.length;b++)w.push('<circle class="bub" style="animation-delay:'+(b*0.75)+'s" cx="'+bx[b]+'" cy="'+(iB-18-(b%2)*26)+'" r="'+(3.5+(b%2))+'" fill="#dbeafe" opacity="0.5"/>');
   w.push('<rect x="548" y="216" width="220" height="28" rx="9" fill="#12253c" stroke="#2b4a6b"/>');
   w.push('<text x="658" y="235" text-anchor="middle" font-size="12.5" font-weight="700" fill="#c8dcf0">ถังเก็บน้ำใส (Clear Water Tank)</text>');
-  var volX=lastTk.x+lastTk.w/2;
+  var mainTk=tanks.reduce(function(a,b){return b.w>a.w?b:a;},tanks[0]);
+  var volX=mainTk.x+mainTk.w/2;
   w.push('<text x="'+volX+'" y="'+((wy+iB)/2+8)+'" text-anchor="middle" font-size="17" font-weight="700" fill="#eaf6ff" '+mono+'>'+vol+' m³</text>');
   if(tanks.length>1)w.push('<text x="'+volX+'" y="'+((wy+iB)/2+26)+'" text-anchor="middle" font-size="9.5" fill="#7ba7d9">(รวม 2 ถัง · smartmap ไม่มีระดับ LV แยก — แสดงเท่าถังหลัก)</text>');
   w.push('<line x1="898" y1="'+wy+'" x2="912" y2="'+wy+'" stroke="#7dd3fc" stroke-width="2.2"/>');
