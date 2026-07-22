@@ -45,6 +45,12 @@ tr:hover td{background:rgba(34,211,238,0.05)}
 .hub{padding:9px 16px;display:flex;align-items:center;gap:10px}
 .hub b{font-family:'JetBrains Mono';font-size:15px}
 .foot{font-size:10px;color:#48596e;margin-top:14px;text-align:center}
+.hin{background:#0d1a2d;border:1px solid #2b4159;border-radius:8px;color:#c8d6e5;padding:6px 10px;font-family:'IBM Plex Sans Thai';font-size:12.5px}
+.hbtn{background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.35);border-radius:8px;color:#67e8f9;padding:6px 14px;font-family:'IBM Plex Sans Thai';font-size:12.5px;font-weight:600;cursor:pointer}
+.hbtn:disabled{opacity:0.4;cursor:default}
+#hTbl{font-size:11.5px}
+#hTbl th{position:sticky;top:0;background:#0d1a2d;cursor:default}
+#hTbl td{font-size:11.5px;padding:5px 8px}
 </style>
 </head>
 <body>
@@ -83,6 +89,24 @@ tr:hover td{background:rgba(34,211,238,0.05)}
   </tr></thead><tbody id="tbody"></tbody></table></div>
 </div>
 
+<div class="glass panel" style="margin-top:14px">
+  <div class="ptitle">รายงานย้อนหลัง — ดึงจากระบบ wqc (/api/report)</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12.5px">
+    <select id="hSt" class="hin"></select>
+    <select id="hGr" class="hin">
+      <option value="h">รายชั่วโมง (1 วัน)</option>
+      <option value="d">รายวัน (1 เดือน)</option>
+      <option value="m">รายเดือน (1 ปี)</option>
+    </select>
+    <input type="date" id="hDate" class="hin">
+    <button class="hbtn" onclick="histLoad()">📥 ดึงข้อมูล</button>
+    <button class="hbtn" id="hCsv" onclick="histCsv()" disabled>⬇ Export CSV</button>
+    <span id="hMsg" style="color:#7d93ab"></span>
+  </div>
+  <div id="hChart"></div>
+  <div style="overflow-x:auto;max-height:420px;overflow-y:auto"><table id="hTbl"></table></div>
+</div>
+
 <div class="foot">โหมด LIVE: intranet → public API → demo อัตโนมัติ · รีเฟรชทุก 60 วินาที · สูตรแนะนำ = Inlet Flow × (เป้าหมาย×e^(k·t/24) − FRC เข้า) × Factor ÷ (100×S.G.) · สมมติระดับน้ำ 4.0 ม. เมื่อไม่มี smartmap · k ของ SR ข้อมูลน้อย</div>
 
 <script>
@@ -112,7 +136,7 @@ function frcC(v){if(v==null)return "#8fb3cc";return v>=0.8?"#22d3ee":(v>=0.5?"#f
 function esc(s){return String(s==null?"":s);}
 
 function calcDose(s){
-  var q=(s.fis!=null?s.fis:s.flow);
+  var q=(s.fis!=null&&s.fis>0)?s.fis:s.flow;
   var fin=(s.frcIn!=null&&s.frcIn>0)?s.frcIn:null;
   if(q==null||fin==null)return null;
   var P=s.chl||{};
@@ -298,6 +322,114 @@ document.querySelectorAll("th[data-k]").forEach(function(th){
     renderAll();
   });
 });
+// ================= รายงานย้อนหลังจาก /api/report =================
+var RPT_HOST="http://172.16.196.100";
+var RPT_PATHS={h:["daily","hourly","day"],d:["monthly","month"],m:["yearly","year"]};
+var HIST={rows:null,cols:null,label:""};
+(function(){
+  var sel=document.getElementById("hSt");
+  sel.innerHTML=IDS.map(function(id){return '<option value="'+id+'">'+META[id].code+' — '+META[id].name+'</option>';}).join("");
+  document.getElementById("hDate").value=new Date().toISOString().slice(0,10);
+})();
+function pad2(n){return (n<10?"0":"")+n;}
+function fmtDT(dt,hh,mm,ss){return dt.getFullYear()+"/"+pad2(dt.getMonth()+1)+"/"+pad2(dt.getDate())+" "+hh+":"+mm+":"+ss;}
+function histRange(gr,dstr){
+  var dt=new Date(dstr+"T00:00:00");
+  if(gr==="h"){return [fmtDT(dt,"00","00","00"),fmtDT(dt,"23","59","59")];}
+  if(gr==="d"){var a=new Date(dt.getFullYear(),dt.getMonth(),1),b=new Date(dt.getFullYear(),dt.getMonth()+1,0);return [fmtDT(a,"00","00","00"),fmtDT(b,"23","59","59")];}
+  var a2=new Date(dt.getFullYear(),0,1),b2=new Date(dt.getFullYear(),11,31);return [fmtDT(a2,"00","00","00"),fmtDT(b2,"23","59","59")];
+}
+window.histLoad=function(){
+  var id=document.getElementById("hSt").value,gr=document.getElementById("hGr").value;
+  var dstr=document.getElementById("hDate").value;
+  var rg=histRange(gr,dstr);
+  var msg=document.getElementById("hMsg");
+  msg.textContent="กำลังดึงข้อมูล…";
+  document.getElementById("hCsv").disabled=true;
+  var toISO=function(s){return new Date(s.replace(/\//g,"-").replace(" ","T")).toISOString();};
+  var cands=[];
+  RPT_PATHS[gr].forEach(function(pth){
+    cands.push({p:pth,f:"",a:rg[0],b:rg[1]});
+    cands.push({p:pth,f:" · เวลา ISO",a:toISO(rg[0]),b:toISO(rg[1])});
+  });
+  function tryNext(){
+    if(!cands.length){msg.textContent="ดึงไม่สำเร็จ — ไม่พบ endpoint ("+RPT_PATHS[gr].join("/")+") หรือเครื่องอยู่นอกวง intranet";return;}
+    var c=cands.shift(),pth=c.p+c.f;
+    var url=RPT_HOST+"/api/report/"+c.p+"/"+id+"?startDate="+encodeURIComponent(c.a)+"&endDate="+encodeURIComponent(c.b);
+    fT(url,15000).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
+      var rows=(j&&j.data)||[];
+      if(!rows.length){msg.textContent="เชื่อมสำเร็จ ("+pth+") แต่ไม่มีข้อมูลช่วงนี้";return;}
+      HIST.rows=rows;HIST.label=META[id].code+"_"+pth+"_"+dstr;
+      msg.textContent="สำเร็จ · "+rows.length+" แถว · endpoint: /api/report/"+pth;
+      renderHist(rows);
+      document.getElementById("hCsv").disabled=false;
+    }).catch(function(){tryNext();});
+  }
+  tryNext();
+};
+function renderHist(rows){
+  // จัดลำดับคอลัมน์: hour ก่อน แล้ว avg แล้ว max/min ที่เหลือ
+  var keys=Object.keys(rows[0]);
+  var lead=["hour"],avgs=keys.filter(function(k){return k.indexOf("avg")===0;});
+  var rest=keys.filter(function(k){return lead.indexOf(k)<0&&avgs.indexOf(k)<0;});
+  var cols=lead.concat(avgs).concat(rest);
+  HIST.cols=cols;
+  var TH={hour:"ช่วงเวลา",avgChlorineIn:"FRC เข้า(เฉลี่ย)",avgChlorineOut:"FRC ออก(เฉลี่ย)",avgFlowIn:"FlowIn(เฉลี่ย)",avgFlowOut:"FlowOut(เฉลี่ย)",avgTurbinity:"ขุ่น(เฉลี่ย)",avgPhid:"pH(เฉลี่ย)",avgConduct:"EC(เฉลี่ย)"};
+  var h='<thead><tr>'+cols.map(function(c){return '<th>'+(TH[c]||c)+'</th>';}).join("")+'</tr></thead><tbody>';
+  rows.forEach(function(r){
+    h+='<tr>'+cols.map(function(c){
+      var v=r[c];
+      if(typeof v==="number")v=Math.round(v*100)/100;
+      var col=(c==="avgChlorineOut")?frcC(r[c]):(c==="hour"?"#67e8f9":"#c8d6e5");
+      return '<td style="color:'+col+(c==="hour"?';font-family:IBM Plex Sans Thai;text-align:left':'')+'">'+(v==null?"—":v)+'</td>';
+    }).join("")+'</tr>';
+  });
+  document.getElementById("hTbl").innerHTML=h+"</tbody>";
+  // กราฟ FRC เข้า/ออก — รองรับทั้งสไตล์ yearly (avgChlorineIn/Out) และ daily (AvgFREE_CL_INLET/AvgChlorine)
+  var kin=null,kout=null;
+  Object.keys(rows[0]).forEach(function(k){
+    var lk=k.toLowerCase();
+    if(lk.indexOf("avg")!==0)return;
+    if(!kin&&(lk.indexOf("free_cl")>=0||lk.indexOf("freecl")>=0||lk.indexOf("chlorinein")>=0))kin=k;
+    if(!kout&&(lk==="avgchlorine"||lk.indexOf("chlorineout")>=0))kout=k;
+  });
+  var ci=rows.map(function(r){return kin?r[kin]:null;}),co=rows.map(function(r){return kout?r[kout]:null;});
+  var _mi=ci.filter(function(v){return v!=null;});
+  var inNote="";
+  if(_mi.length&&Math.max.apply(null,_mi)>20){ci=ci.map(function(v){return v==null?null:v/100;});inNote=" (÷100)";}
+  if(co.some(function(v){return v!=null;})){
+    var W=1100,Hh=200,n=rows.length;
+    var all=ci.concat(co).filter(function(v){return v!=null;});
+    var mn=Math.min.apply(null,all.concat([0.4])),mx=Math.max.apply(null,all)+0.1;
+    var X=function(i){return 50+(W-70)*i/Math.max(1,n-1);},Y=function(v){return 14+(Hh-42)*(1-(v-mn)/(mx-mn));};
+    var svg='<svg viewBox="0 0 '+W+' '+Hh+'" style="width:100%;height:auto;font-family:JetBrains Mono">';
+    [[0.8,"#fbbf24"],[0.5,"#f87171"]].forEach(function(t){
+      if(t[0]>mn&&t[0]<mx){svg+='<line x1="50" y1="'+Y(t[0])+'" x2="'+(W-20)+'" y2="'+Y(t[0])+'" stroke="'+t[1]+'" stroke-dasharray="4 4" stroke-width="1" opacity="0.6"/><text x="'+(W-16)+'" y="'+(Y(t[0])+4)+'" font-size="10" fill="'+t[1]+'">'+t[0]+'</text>';}
+    });
+    [[ci,"#67e8f9","FRC เข้า"+inNote],[co,"#4ade80","FRC ออก"]].forEach(function(sr,si){
+      var pts=sr[0].map(function(v,i){return v==null?null:X(i)+","+Y(v);}).filter(Boolean).join(" ");
+      if(pts)svg+='<polyline points="'+pts+'" fill="none" stroke="'+sr[1]+'" stroke-width="2"/>';
+      svg+='<text x="'+(60+si*110)+'" y="12" font-size="11" fill="'+sr[1]+'">— '+sr[2]+'</text>';
+    });
+    rows.forEach(function(r,i){
+      if(n<=31||i%Math.ceil(n/24)===0)svg+='<text x="'+X(i)+'" y="'+(Hh-4)+'" text-anchor="middle" font-size="9" fill="#5b7089">'+String(r.hour).slice(0,7)+'</text>';
+    });
+    document.getElementById("hChart").innerHTML=svg+"</svg>";
+  }else document.getElementById("hChart").innerHTML="";
+}
+window.histCsv=function(){
+  if(!HIST.rows)return;
+  var cols=HIST.cols;
+  var csv="\uFEFF"+cols.join(",")+"\n";
+  HIST.rows.forEach(function(r){
+    csv+=cols.map(function(c){var v=r[c];return v==null?"":String(v).replace(/,/g,";");}).join(",")+"\n";
+  });
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download="frc_report_"+HIST.label+".csv";
+  a.click();
+};
+
 function tick(){document.getElementById("clock").textContent=new Date().toLocaleTimeString("th-TH",{hour12:false});}
 setInterval(tick,1000);tick();
 loadData();
