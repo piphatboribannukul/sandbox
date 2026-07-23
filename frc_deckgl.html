@@ -96,7 +96,7 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
     </div>
     <a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
-    <a href="frc_report.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📄 รายงาน</a>
+    
     <div class="badge"><div class="dot"></div><span>DEMO MODE</span></div>
   </div>
   <div style="text-align:right"><div class="clock" id="clock">--:--:--</div><div class="clock-date" id="clockDate"></div></div>
@@ -828,7 +828,10 @@ window.dpCalc=function(){
     S.dose={target:t,factor:fa,sg:sg,frcin:autoV?null:fi,k:isFinite(kd)?kd:null,t:autoV?null:(isFinite(rt)?rt:null),q:autoV?null:(isFinite(q)?q:null),auto:autoV,src:S.detailOpen};
   }else if(S.dose){S.dose.auto=autoV;}
   if(!isFinite(kd))kd=0;if(!isFinite(rt))rt=0;
-  if(!isFinite(q))q=(s.qin!=null?s.qin:(s.fis!=null?s.fis:(s.flow||null)));
+  if(!isFinite(q)||q<=0){
+    q=((!s.bypass)&&s.qin!=null&&s.qin>0)?s.qin
+      :((s.fis!=null&&s.fis>0)?s.fis:((s.flowLive!=null&&s.flowLive>0)?s.flowLive:(s.flow||null)));
+  }
   var fin=(fi!=null&&isFinite(fi))?fi:((s.frcIn!=null&&s.frcIn>0)?s.frcIn:null);
   var el=document.getElementById("dpDoseVal"),e2=document.getElementById("dpCreq");
   if(!el)return;
@@ -843,6 +846,28 @@ window.dpCalc=function(){
 window.dpKpick=function(v){S.doseTouched=true;var e=document.getElementById("dpK");if(v!=="c"&&e)e.value=v;window.dpCalc();};
 window.dpAutoToggle=function(v){S.doseTouched=true;if(S.dose)S.dose.auto=v;renderDetail(S.detailOpen);};
 window.dpTouch=function(){S.doseTouched=true;};
+// ===== บันทึกสถานะปั๊มดึงน้ำ inlet รายชั่วโมง (เขียนโดยหน้าที่เปิดอยู่) =====
+function hourKey(){var d=new Date();var p=function(n){return (n<10?"0":"")+n;};
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours());}
+function fbLogPumps(){
+  try{
+    if(!FB||!firebase.auth().currentUser)return;
+    var hk=hourKey();
+    if(S.pumpLogged===hk)return;
+    var wrote=false;
+    IDS.forEach(function(id){
+      var st=S.stations[id];if(!st)return;
+      if(st.p1==null&&st.p2==null)return; // โหมด public ไม่มีข้อมูลปั๊ม
+      var rec={at:new Date().toISOString()};
+      if(st.p1!=null)rec.p1=st.p1?1:0;
+      if(st.p2!=null)rec.p2=st.p2?1:0;
+      FB.ref("frcTwin/pumplog/"+id+"/"+hk).set(rec).catch(function(){});
+      wrote=true;
+    });
+    if(wrote)S.pumpLogged=hk;
+  }catch(e){}
+}
+
 function renderDetail(id){
   var s=S.stations[id];
   var el=document.getElementById("dpInner");
@@ -850,8 +875,12 @@ function renderDetail(id){
   var f=Math.max(0.06,Math.min((s.level||0)/(s.maxLv||6),1));
   var inTxt=(s.frcIn!=null&&s.frcIn>0)?s.frcIn.toFixed(2):"—";
   var outTxt=s.frcOut!=null?s.frcOut.toFixed(2):"—";
-  var qinN=(s.qin!=null?s.qin:(s.fis!=null?s.fis:null));
-  var qin=qinN!=null?Math.round(qinN).toLocaleString():"—";
+  var qinRaw=(s.qin!=null&&isFinite(s.qin))?s.qin:null;
+  var qinShow=(qinRaw!=null)?Math.max(0,qinRaw):((s.fis!=null&&s.fis>0)?s.fis:null);
+  var qin=qinShow!=null?Math.round(qinShow).toLocaleString():"—";
+  // ค่าเข้าสูตร: ตอน bypass หรือ Qin เพี้ยน (<=0) ใช้น้ำเข้าสถานี/น้ำจ่ายแทน
+  var qinN=((!s.bypass)&&qinRaw!=null&&qinRaw>0)?qinRaw
+    :((s.fis!=null&&s.fis>0)?s.fis:((s.flowLive!=null&&s.flowLive>0)?s.flowLive:null));
   var fl=s.flowLive!=null?Math.round(s.flowLive).toLocaleString():"—";
   var vol=(s.level!=null&&s.area)?Math.round(s.level*s.area).toLocaleString():"—";
   var lv=s.level!=null?s.level.toFixed(2):"—";
@@ -1096,7 +1125,7 @@ function renderDetail(id){
         +'<input id="dpK" class="dp-in" type="number" step="0.01" style="width:76px" oninput="dpTouch();dpCalc()" value="'+dpKv+'">'
       +'</span>'
       +'</div>'
-      +'<div style="font-size:11.5px;color:#e8b4b8;margin-top:9px;text-align:center">FRC ขาออกคาดการณ์ (ยังไม่เติมเสริม): <span id="dpPred" style="color:#fde68a;font-family:JetBrains Mono,monospace;font-weight:700">—</span> mg/L · วัดจริง <span style="color:#a7f3d0;font-family:JetBrains Mono,monospace;font-weight:700">'+outTxt+'</span> mg/L</div>'
+      +'<div style="font-size:11.5px;color:#e8b4b8;margin-top:9px;text-align:center">FRC ขาออกคาดการณ์ (ยังไม่เติมเสริม): <span id="dpPred" style="color:#fde68a;font-family:JetBrains Mono,monospace;font-weight:700">—</span> mg/L · วัดจริง <span style="color:#a7f3d0;font-family:JetBrains Mono,monospace;font-weight:700">'+outTxt+'</span> mg/L'+(byp?' <span style="color:#fbbf24">· สภาพจริงขณะนี้: BYPASS ไม่ผ่านถัง (t=0) — เทียบ What-If ไม่ได้ตรงๆ</span>':'')+'</div>'
       +'<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'
       +'<button class="dp-back" style="border-color:#7a3d47;color:#f3c7cb;flex:1" onclick="dpCalc()">คำนวณ</button>'
       +'<button class="dp-back" style="border-color:#1d5c40;color:#86efac;flex:1" onclick="fbSaveDose()">💾 บันทึก</button>'
@@ -1118,7 +1147,8 @@ map.on("load",function(){
   setTimeout(function(){map.flyTo({center:[100.56,13.74],zoom:10.4,pitch:52,bearing:-14,duration:2600});},400);
 });
 setTimeout(hideLoading,4000);
-var cd=REFRESH;setInterval(function(){cd--;if(cd<=0){loadData();if(S.detailOpen)loadChlorineInfo(S.detailOpen);cd=REFRESH;}},1000);
+var cd=REFRESH;setInterval(function(){cd--;if(cd<=0){loadData();if(S.detailOpen)loadChlorineInfo(S.detailOpen);setTimeout(fbLogPumps,9000);cd=REFRESH;}},1000);
+setTimeout(fbLogPumps,15000);
 }
 
 (function waitLib(n){
