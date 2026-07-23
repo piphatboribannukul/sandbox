@@ -434,10 +434,21 @@ function renderHist(rows){
       if(pts)svg+='<polyline points="'+pts+'" fill="none" stroke="'+sr[1]+'" stroke-width="2"/>';
       svg+='<text x="'+(60+si*110)+'" y="12" font-size="11" fill="'+sr[1]+'">— '+sr[2]+'</text>';
     });
+    // แกน x อัจฉริยะ: รายชั่วโมง -> HH:MM + วันที่กำกับ / รายวัน -> วว/ดด / รายเดือน -> ชื่อเดือน
+    var parseH=rows.map(function(r){return String(r.hour).trim().match(/^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}:\d{2}))?/);});
+    var isHourly=parseH.every(Boolean)&&parseH.some(function(m){return m[4]&&m[4]!=="00:00";});
+    var hlbl=function(i){
+      var p=parseH[i];
+      if(!p)return String(rows[i].hour).slice(0,10);
+      return isHourly?(p[4]||""):(p[1]+"/"+p[2]);
+    };
+    var step=Math.max(1,Math.ceil(n/12));
     rows.forEach(function(r,i){
-      if(n<=31||i%Math.ceil(n/24)===0)svg+='<text x="'+X(i)+'" y="'+(Hh-4)+'" text-anchor="middle" font-size="9" fill="#5b7089">'+String(r.hour).slice(0,7)+'</text>';
+      if(i%step===0||i===n-1)svg+='<text x="'+X(i)+'" y="'+(Hh-4)+'" text-anchor="middle" font-size="9.5" fill="#5b7089">'+hlbl(i)+'</text>';
     });
-    document.getElementById("hChart").innerHTML=svg+"</svg>";
+    var dcap="";
+    if(isHourly&&parseH[0])dcap='<div style="text-align:center;font-size:11px;color:#67e8f9;margin-top:2px">วันที่ '+parseH[0][1]+'/'+parseH[0][2]+'/'+parseH[0][3]+' · รายชั่วโมง</div>';
+    document.getElementById("hChart").innerHTML=svg+"</svg>"+dcap;
   }else document.getElementById("hChart").innerHTML="";
 }
 window.histCsv=function(){
