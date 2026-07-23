@@ -107,9 +107,26 @@ tr:hover td{background:rgba(34,211,238,0.05)}
   <div style="overflow-x:auto;max-height:420px;overflow-y:auto"><table id="hTbl"></table></div>
 </div>
 
+<div class="glass panel" style="margin-top:14px">
+  <div class="ptitle">ประวัติปั๊มดึงน้ำ inlet — บันทึกรายชั่วโมงโดยหน้าจอที่เปิดอยู่</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12.5px">
+    <select id="pSt" class="hin"></select>
+    <input type="date" id="pDate" class="hin">
+    <button class="hbtn" onclick="pumpLoad()">📥 ดูประวัติ</button>
+    <span id="pMsg" style="color:#7d93ab"></span>
+  </div>
+  <div id="pView"></div>
+</div>
+
 <div class="foot">โหมด LIVE: intranet → public API → demo อัตโนมัติ · รีเฟรชทุก 60 วินาที · สูตรแนะนำ = Inlet Flow × (เป้าหมาย×e^(k·t/24) − FRC เข้า) × Factor ÷ (100×S.G.) · สมมติระดับน้ำ 4.0 ม. เมื่อไม่มี smartmap · k ของ SR ข้อมูลน้อย</div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
+var FB_CONFIG={apiKey:"AIzaSyBMv3wQI02clGMHnna4XaIx078G7kaSYqg",authDomain:"wqcmap-7f9d2.firebaseapp.com",databaseURL:"https://wqcmap-7f9d2-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"wqcmap-7f9d2"};
+var FB=null,FB_DB_URL=FB_CONFIG.databaseURL;
+try{if(typeof firebase!=="undefined"){firebase.initializeApp(FB_CONFIG);FB=firebase.database();firebase.auth().signInAnonymously().catch(function(){});}}catch(e){}
 var API="http://172.16.196.100:3000/api",REFRESH=60;
 var HUB_API="https://twqonline.mwa.co.th/TWQMSServicepublic/api/mwaonmobile/getStations";
 var PUB_MAP={SW01:"18",SW02:"9",SW03:"17",SW04:"14",SW05:"20",SW06:"15",SW07:"19",SW08:"5",SW09:"4",SW10:"16"};
@@ -343,6 +360,7 @@ window.histLoad=function(){
   var id=document.getElementById("hSt").value,gr=document.getElementById("hGr").value;
   var dstr=document.getElementById("hDate").value;
   var rg=histRange(gr,dstr);
+  HIST._okPth=null;
   var msg=document.getElementById("hMsg");
   msg.textContent="กำลังดึงข้อมูล…";
   document.getElementById("hCsv").disabled=true;
@@ -353,12 +371,17 @@ window.histLoad=function(){
     cands.push({p:pth,f:" · เวลา ISO",a:toISO(rg[0]),b:toISO(rg[1])});
   });
   function tryNext(){
-    if(!cands.length){msg.textContent="ดึงไม่สำเร็จ — ไม่พบ endpoint ("+RPT_PATHS[gr].join("/")+") หรือเครื่องอยู่นอกวง intranet";return;}
+    if(!cands.length){
+      msg.textContent=HIST._okPth
+        ?"เชื่อมสำเร็จ ("+HIST._okPth+") แต่ไม่มีข้อมูลช่วงนี้ — ลองเปลี่ยนวัน/สถานี"
+        :"ดึงไม่สำเร็จ — ไม่พบ endpoint ("+RPT_PATHS[gr].join("/")+") หรือเครื่องอยู่นอกวง intranet";
+      return;
+    }
     var c=cands.shift(),pth=c.p+c.f;
     var url=RPT_HOST+"/api/report/"+c.p+"/"+id+"?startDate="+encodeURIComponent(c.a)+"&endDate="+encodeURIComponent(c.b);
     fT(url,15000).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
       var rows=(j&&j.data)||[];
-      if(!rows.length){msg.textContent="เชื่อมสำเร็จ ("+pth+") แต่ไม่มีข้อมูลช่วงนี้";return;}
+      if(!rows.length){HIST._okPth=pth;tryNext();return;} // endpoint มีจริงแต่ช่วงนี้ว่าง — ลองรูปแบบ/ชื่ออื่นต่อให้ครบ
       HIST.rows=rows;HIST.label=META[id].code+"_"+pth+"_"+dstr;
       msg.textContent="สำเร็จ · "+rows.length+" แถว · endpoint: /api/report/"+pth;
       renderHist(rows);
@@ -429,6 +452,64 @@ window.histCsv=function(){
   a.download="frc_report_"+HIST.label+".csv";
   a.click();
 };
+
+// ===== ประวัติปั๊ม inlet =====
+(function(){
+  var sel=document.getElementById("pSt");
+  sel.innerHTML=IDS.map(function(id){return '<option value="'+id+'">'+META[id].code+' — '+META[id].name+'</option>';}).join("");
+  document.getElementById("pDate").value=new Date().toISOString().slice(0,10);
+})();
+window.pumpLoad=function(){
+  var id=document.getElementById("pSt").value,dstr=document.getElementById("pDate").value;
+  var msg=document.getElementById("pMsg");msg.textContent="กำลังดึง…";
+  fT(FB_DB_URL+"/frcTwin/pumplog/"+id+".json?orderBy=%22$key%22&startAt=%22"+dstr+"T00%22&endAt=%22"+dstr+"T23%22",10000)
+  .then(function(r){return r.json();}).then(function(j){
+    j=j||{};
+    var hrs=[],c1=0,c2=0,have=0;
+    for(var h=0;h<24;h++){
+      var k=dstr+"T"+((h<10?"0":"")+h);
+      var v=j[k]||null;hrs.push(v);
+      if(v){have++;if(v.p1===1)c1++;if(v.p2===1)c2++;}
+    }
+    if(!have){msg.textContent="ไม่มีบันทึกของวันนี้ (ต้องมีหน้าจอเปิดทิ้งไว้ถึงจะเก็บ)";document.getElementById("pView").innerHTML="";return;}
+    msg.textContent="มีบันทึก "+have+"/24 ชม. · P1 ทำงาน "+c1+" ชม. · P2 ทำงาน "+c2+" ชม.";
+    var strip=function(pn){
+      var s='<div style="display:flex;align-items:center;gap:8px;margin:6px 0"><span style="width:34px;font-size:12px;color:#8fb3cc;font-weight:700">'+pn.toUpperCase()+'</span><div style="display:flex;gap:2px;flex:1">';
+      hrs.forEach(function(v,h){
+        var st=(v&&v[pn]!=null)?v[pn]:null;
+        var c=st===1?"#16a34a":(st===0?"#334155":"#131c2b");
+        var t=(h<10?"0":"")+h+":00 — "+(st===1?"ทำงาน":(st===0?"หยุด":"ไม่มีข้อมูล"));
+        s+='<div title="'+t+'" style="flex:1;height:26px;border-radius:4px;background:'+c+';border:1px solid rgba(51,65,85,0.5)"></div>';
+      });
+      return s+'</div></div>';
+    };
+    var hourAxis='<div style="display:flex;gap:2px;margin-left:42px">'+hrs.map(function(_,h){return '<div style="flex:1;text-align:center;font-size:8.5px;color:#48596e;font-family:JetBrains Mono">'+(h%3===0?((h<10?"0":"")+h):"")+'</div>';}).join("")+'</div>';
+    document.getElementById("pView").innerHTML=strip("p1")+strip("p2")+hourAxis
+      +'<div style="font-size:10.5px;color:#48596e;margin-top:8px">🟩 ทำงาน · ⬛ หยุด · ช่องมืด = ไม่มีข้อมูล (ไม่มีหน้าจอเปิด/นอกวง intranet ช่วงนั้น)</div>';
+  }).catch(function(){msg.textContent="ดึงไม่สำเร็จ (เช็คอินเทอร์เน็ต/Firebase rules)";});
+};
+// ===== ตัวบันทึกฝั่ง dashboard (สำรองกรณีหน้าแผนที่ไม่ได้เปิด) =====
+var pumpLogged=null;
+function fbLogPumps2(){
+  try{
+    if(!FB||!firebase.auth().currentUser)return;
+    var dnow=new Date();var p=function(n){return (n<10?"0":"")+n;};
+    var hk=dnow.getFullYear()+"-"+p(dnow.getMonth()+1)+"-"+p(dnow.getDate())+"T"+p(dnow.getHours());
+    if(pumpLogged===hk)return;
+    var wrote=false;
+    IDS.forEach(function(id){
+      var st=S.st[id];if(!st)return;
+      if(st.p1==null&&st.p2==null)return;
+      var rec={at:dnow.toISOString()};
+      if(st.p1!=null)rec.p1=st.p1?1:0;
+      if(st.p2!=null)rec.p2=st.p2?1:0;
+      FB.ref("frcTwin/pumplog/"+id+"/"+hk).set(rec).catch(function(){});
+      wrote=true;
+    });
+    if(wrote)pumpLogged=hk;
+  }catch(e){}
+}
+setInterval(fbLogPumps2,65000);setTimeout(fbLogPumps2,15000);
 
 function tick(){document.getElementById("clock").textContent=new Date().toLocaleTimeString("th-TH",{hour12:false});}
 setInterval(tick,1000);tick();
