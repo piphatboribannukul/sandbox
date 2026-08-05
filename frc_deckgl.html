@@ -282,7 +282,7 @@ function mkMapStyle(theme){
     ]};
 }
 
-const map=new maplibregl.Map({
+const map=new maplibregl.Map({doubleClickZoom:false,
   container:"map",style:mkMapStyle("dark"),
   center:[100.55,13.75],zoom:8.8,pitch:0,bearing:0,maxPitch:70,antialias:true,
   maxBounds:[[100.20,13.40],[101.02,14.10]],maxTileCacheSize:200
@@ -613,13 +613,16 @@ function renderRanking(){
 }
 
 window.selectStation=function(id){
-  if(S.selectedId===id&&S.stations[id]){openDetail(id);return;}
+  if(S.selectedId===id&&S.stations[id]){clearTimeout(S._selT);openDetail(id);return;}
   S.selectedId=id;
   var st=S.stations[id];
   S.simLevel=(st&&st.level)?Math.round(st.level*10)/10:4.0;
   S.simFlow=(st&&st.flowLive)?Math.min(30000,Math.max(2000,Math.round(st.flowLive/500)*500)):META[id].flow;
-  map.flyTo({center:[META[id].coord[0],META[id].coord[1]-0.004],zoom:14.4,pitch:60,bearing:-18,duration:1600});
-  renderInfo();
+  clearTimeout(S._selT);
+  S._selT=setTimeout(function(){ // หน่วงสั้นๆ: ถ้าคลิกซ้ำมาทัน ไอคอนยังอยู่ที่เดิม -> เข้าหน้าสถานีชัวร์
+    map.flyTo({center:[META[id].coord[0],META[id].coord[1]-0.004],zoom:14.4,pitch:60,bearing:-18,duration:1600});
+    renderInfo();
+  },260);
 };
 
 function renderInfo(){
