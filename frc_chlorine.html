@@ -17,6 +17,8 @@ body{background:#0a1220;color:#c8d6e5;font-family:'IBM Plex Sans Thai',sans-seri
 #badge{font-family:'JetBrains Mono';font-size:10px;padding:5px 12px;border-radius:14px;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);color:#67e8f9}
 .wrap{max-width:1500px;margin:0 auto;padding:18px 22px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.chartcard{background:#0d1a2d;border:1px solid #223650;border-radius:16px;padding:14px 18px;margin-bottom:14px}
+.ctitle{font-size:13px;font-weight:700;color:#c8d6e5;margin-bottom:8px}
 .kpi{background:linear-gradient(160deg,#0e1a2e,#0b1524);border:1px solid rgba(45,64,89,0.6);border-radius:14px;padding:14px 18px}
 .kpi .lb{font-size:11px;color:#5b7089;margin-bottom:6px}
 .kpi .v{font-family:'JetBrains Mono';font-size:24px;font-weight:700;color:#e8f2fc}
@@ -68,6 +70,8 @@ body{background:#0a1220;color:#c8d6e5;font-family:'IBM Plex Sans Thai',sans-seri
     <div class="kpi"><div class="lb">เชื่อมข้อมูลได้</div><div class="v" id="kOn">—<span class="u"> / 9 สถานี</span></div></div>
     <div class="kpi"><div class="lb">อัปเดตล่าสุด</div><div class="v" id="kTime" style="font-size:16px">—</div></div>
   </div>
+  <div class="chartcard"><div class="ctitle">📊 ปริมาณคลอรีนคงเหลือใน Stock (ลิตร)</div><div id="chartStock"></div></div>
+  <div class="chartcard"><div class="ctitle">📊 อัตราการจ่ายคลอรีนปลายสาย (ลิตร/ชั่วโมง)</div><div id="chartRate"></div></div>
   <div class="grid" id="grid"></div>
   <div class="foot">เกณฑ์เติม: 11,000 ลิตร (มีนบุรี 20,000 ลิตร) · ข้อมูลจาก /api/chlorine-tank (รีเฟรชทุก 60 วิ) · สถานีที่ขึ้น "รอเชื่อมข้อมูล" = backend ยังไม่ต่อระบบถังของสถานีนั้น</div>
 </div>
@@ -87,7 +91,8 @@ var CFG={
   "19":{code:"BP",name:"บางพลี",    n:4,size:6000, th:11000}
 };
 var IDS=Object.keys(CFG);
-var S={tanks:{}};
+var S={tanks:{},reco:{}};
+var WQC3="http://172.16.196.100:3000";
 function fT(u,ms){return Promise.race([fetch(u,{cache:"no-store"}),new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"));},ms||17000);})]);}
 function nf(v){v=parseFloat(v);return isFinite(v)?v:null;}
 function loadAll(){
@@ -105,7 +110,52 @@ function loadAll(){
         document.getElementById("badge").textContent=okc>0?("● LIVE · เชื่อมได้ "+okc+"/9"):"◌ นอกวง intranet — แสดง \"—\" ทุกสถานี";}});
   });
 }
+function drawCharts(){
+  var W=1080,H=225,padL=52,padB=28,padT=18,cw=(W-padL-24)/IDS.length;
+  var vmax=1000;
+  IDS.forEach(function(id){var c=CFG[id],t=S.tanks[id]||{};vmax=Math.max(vmax,t.vol||0,c.th,c.n*c.size*0.6);});
+  vmax*=1.12;
+  var Y=function(v){return padT+(H-padT-padB)*(1-v/vmax);};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;font-family:JetBrains Mono">';
+  [0,0.25,0.5,0.75,1].forEach(function(f){var v=vmax*f;
+    s+='<line x1="'+padL+'" y1="'+Y(v)+'" x2="'+(W-12)+'" y2="'+Y(v)+'" stroke="#1b2a40"/>'
+      +'<text x="'+(padL-8)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="10" fill="#5b7089">'+Math.round(v/1000)+'k</text>';});
+  IDS.forEach(function(id,i){
+    var c=CFG[id],t=S.tanks[id]||{},vol=t.vol,x=padL+i*cw,bw=cw*0.42;
+    var isLow=(vol!=null&&vol<=c.th);
+    if(vol!=null){
+      s+='<rect x="'+(x+cw*0.29)+'" y="'+Y(vol)+'" width="'+bw+'" height="'+Math.max(1,Y(0)-Y(vol))+'" rx="3" fill="'+(isLow?"#f87171":"#38bdf8")+'"><title>'+c.code+' '+Math.round(vol).toLocaleString()+' ล.</title></rect>'
+        +'<text x="'+(x+cw*0.5)+'" y="'+(Y(vol)-5)+'" text-anchor="middle" font-size="10" fill="'+(isLow?"#fca5a5":"#9bd7ff")+'">'+(Math.round(vol/100)/10)+'k</text>';
+    }else s+='<text x="'+(x+cw*0.5)+'" y="'+(Y(0)-6)+'" text-anchor="middle" font-size="11" fill="#3a4a5e">—</text>';
+    s+='<line x1="'+(x+cw*0.16)+'" y1="'+Y(c.th)+'" x2="'+(x+cw*0.84)+'" y2="'+Y(c.th)+'" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/>'
+      +'<text x="'+(x+cw*0.5)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11.5" fill="#8fb3cc">'+c.code+'</text>';
+  });
+  s+='<line x1="'+(W-268)+'" y1="14" x2="'+(W-246)+'" y2="14" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/><text x="'+(W-240)+'" y="18" font-size="10.5" fill="#8fb3cc">เกณฑ์เติม (รายสถานี)</text>'
+   +'<rect x="'+(W-112)+'" y="8" width="12" height="12" rx="2" fill="#38bdf8"/><text x="'+(W-95)+'" y="18" font-size="10.5" fill="#8fb3cc">คงเหลือ</text>';
+  document.getElementById("chartStock").innerHTML=s+'</svg>';
+
+  var rmax=10;
+  IDS.forEach(function(id){var t=S.tanks[id]||{};rmax=Math.max(rmax,S.reco[id]||0,t.dose||0);});
+  rmax*=1.18;
+  var Y2=function(v){return padT+(H-padT-padB)*(1-v/rmax);};
+  var s2='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;font-family:JetBrains Mono">';
+  [0,0.5,1].forEach(function(f){var v=rmax*f;
+    s2+='<line x1="'+padL+'" y1="'+Y2(v)+'" x2="'+(W-12)+'" y2="'+Y2(v)+'" stroke="#1b2a40"/>'
+      +'<text x="'+(padL-8)+'" y="'+(Y2(v)+4)+'" text-anchor="end" font-size="10" fill="#5b7089">'+Math.round(v)+'</text>';});
+  IDS.forEach(function(id,i){
+    var c=CFG[id],t=S.tanks[id]||{},x=padL+i*cw,bw=cw*0.26;
+    var rc=S.reco[id],ds=t.dose;
+    if(rc!=null)s2+='<rect x="'+(x+cw*0.2)+'" y="'+Y2(rc)+'" width="'+bw+'" height="'+Math.max(1,Y2(0)-Y2(rc))+'" rx="3" fill="#fbbf24"><title>'+c.code+' แนะนำ '+rc.toFixed(1)+'</title></rect>';
+    if(ds!=null)s2+='<rect x="'+(x+cw*0.52)+'" y="'+Y2(ds)+'" width="'+bw+'" height="'+Math.max(1,Y2(0)-Y2(ds))+'" rx="3" fill="#38bdf8"><title>'+c.code+' จ่ายจริง '+ds.toFixed(1)+'</title></rect>';
+    if(rc==null&&ds==null)s2+='<text x="'+(x+cw*0.5)+'" y="'+(Y2(0)-6)+'" text-anchor="middle" font-size="11" fill="#3a4a5e">—</text>';
+    s2+='<text x="'+(x+cw*0.5)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11.5" fill="#8fb3cc">'+c.code+'</text>';
+  });
+  s2+='<rect x="'+(W-262)+'" y="8" width="12" height="12" rx="2" fill="#fbbf24"/><text x="'+(W-245)+'" y="18" font-size="10.5" fill="#8fb3cc">อัตราแนะนำ (ระบบ wqc)</text>'
+    +'<rect x="'+(W-112)+'" y="8" width="12" height="12" rx="2" fill="#38bdf8"/><text x="'+(W-95)+'" y="18" font-size="10.5" fill="#8fb3cc">อัตราจ่ายจริง</text>';
+  document.getElementById("chartRate").innerHTML=s2+'</svg>';
+}
 function render(){
+  drawCharts();
   var total=0,low=0,on=0,html="";
   IDS.forEach(function(id){
     var c=CFG[id],t=S.tanks[id]||{},cap=c.n*c.size;
@@ -149,8 +199,20 @@ window.refill=function(id){
     navigator.clipboard.writeText(msg).then(function(){alert("คัดลอกข้อความแจ้งเติมแล้ว — นำไปวางใน LINE/อีเมลได้เลย\n\n"+msg);});
   }else alert(msg);
 };
-render();loadAll();
+function loadReco(){
+  var done=0;
+  IDS.forEach(function(id){
+    fT(WQC3+"/api/chlorine/"+id,8000)
+      .then(function(r){if(!r.ok)throw 0;return r.json();})
+      .catch(function(){return fT(CHL_HOST+"/api/chlorine/"+id,9000).then(function(r){if(!r.ok)throw 0;return r.json();});})
+      .then(function(j){var v=(j&&j.data)||{};var rc=parseFloat(v.chlorine);if(isFinite(rc))S.reco[id]=Math.max(0,rc);})
+      .catch(function(){})
+      .then(function(){done++;if(done===IDS.length)render();});
+  });
+}
+render();loadAll();loadReco();
 setInterval(loadAll,REFRESH*1000);
+setInterval(loadReco,REFRESH*1000);
 </script>
 </body>
 </html>
