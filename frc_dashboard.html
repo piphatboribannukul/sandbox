@@ -58,6 +58,7 @@ tr:hover td{background:rgba(34,211,238,0.05)}
   <div><h1>Dashboard ภาพรวมระบบจ่ายคลอรีนปลายสาย</h1><div class="sub">All-station overview • MWA Water Quality</div></div>
   <div class="nav">
     <a href="frc_deckgl.html">🗺 แผนที่</a>
+    <a href="frc_chlorine.html">🧪 คลอรีน</a>
     <a class="on" href="frc_dashboard.html">📊 Dashboard</a>
     <a href="#" onclick="window.close();setTimeout(function(){location.href='frc_deckgl.html';},200);return false;" style="border-color:rgba(248,113,113,0.35);color:#fca5a5">✕ ปิด</a>
   </div>
@@ -107,11 +108,21 @@ tr:hover td{background:rgba(34,211,238,0.05)}
 </div>
 
 <div class="glass panel" style="margin-top:14px">
-  <div class="ptitle">ประวัติปั๊มดึงน้ำ inlet — บันทึกรายชั่วโมงโดยหน้าจอที่เปิดอยู่</div>
+  <div class="ptitle">ประวัติปั๊มดึงน้ำ INLET</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12.5px">
     <select id="pSt" class="hin"></select>
+    <select id="pMode" class="hin" onchange="pumpModeUI()">
+      <option value="d">รายวัน</option>
+      <option value="m">รายเดือน</option>
+      <option value="r">กำหนดช่วง</option>
+    </select>
     <input type="date" id="pDate" class="hin">
+    <input type="month" id="pMonth" class="hin" style="display:none">
+    <input type="date" id="pD1" class="hin" style="display:none">
+    <span id="pTo" style="display:none;color:#7d93ab">ถึง</span>
+    <input type="date" id="pD2" class="hin" style="display:none">
     <button class="hbtn" onclick="pumpLoad()">📥 ดูประวัติ</button>
+    <button class="hbtn" id="pCsv" onclick="pumpCsv()" disabled>⬇ Export CSV</button>
     <span id="pMsg" style="color:#7d93ab"></span>
   </div>
   <div id="pView"></div>
@@ -463,40 +474,102 @@ window.histCsv=function(){
   a.click();
 };
 
-// ===== ประวัติปั๊ม inlet =====
+// ===== ประวัติปั๊ม inlet (v2: รายวัน/รายเดือน/ช่วง + CSV) =====
 (function(){
   var sel=document.getElementById("pSt");
   sel.innerHTML=IDS.map(function(id){return '<option value="'+id+'">'+META[id].code+' — '+META[id].name+'</option>';}).join("");
-  document.getElementById("pDate").value=new Date().toISOString().slice(0,10);
+  var today=new Date().toISOString().slice(0,10);
+  document.getElementById("pDate").value=today;
+  document.getElementById("pMonth").value=today.slice(0,7);
+  document.getElementById("pD1").value=today;
+  document.getElementById("pD2").value=today;
 })();
+window.pumpModeUI=function(){
+  var m=document.getElementById("pMode").value;
+  document.getElementById("pDate").style.display=(m==="d")?"":"none";
+  document.getElementById("pMonth").style.display=(m==="m")?"":"none";
+  ["pD1","pTo","pD2"].forEach(function(x){document.getElementById(x).style.display=(m==="r")?"":"none";});
+};
+var PUMP={recs:null,label:""};
+function daysBetween(a,b){var out=[],d=new Date(a+"T00:00:00");var end=new Date(b+"T00:00:00");
+  while(d<=end&&out.length<62){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}return out;}
+function onRanges(hh){ // [0,1,1,1,0,...] -> "01–03"
+  var out=[],st=null;
+  for(var h=0;h<=24;h++){var v=h<24&&hh[h]===1;
+    if(v&&st==null)st=h;
+    if(!v&&st!=null){out.push(st===h-1?String(st).padStart?String(st).padStart(2,"0"):(st<10?"0"+st:st):((st<10?"0"+st:st)+"–"+((h-1)<10?"0"+(h-1):h-1)));st=null;}}
+  return out.join(", ")||"—";
+}
 window.pumpLoad=function(){
-  var id=document.getElementById("pSt").value,dstr=document.getElementById("pDate").value;
+  var id=document.getElementById("pSt").value,m=document.getElementById("pMode").value;
+  var d1,d2;
+  if(m==="d"){d1=d2=document.getElementById("pDate").value;}
+  else if(m==="m"){var mo=document.getElementById("pMonth").value;d1=mo+"-01";
+    var e=new Date(mo.slice(0,4),+mo.slice(5,7),0);d2=mo+"-"+(e.getDate()<10?"0":"")+e.getDate();}
+  else{d1=document.getElementById("pD1").value;d2=document.getElementById("pD2").value;
+    if(d1>d2){var t=d1;d1=d2;d2=t;}}
   var msg=document.getElementById("pMsg");msg.textContent="กำลังดึง…";
-  fT(FB_DB_URL+"/frcTwin/pumplog/"+id+".json?orderBy=%22$key%22&startAt=%22"+dstr+"T00%22&endAt=%22"+dstr+"T23%22",10000)
+  document.getElementById("pCsv").disabled=true;
+  fT(FB_DB_URL+"/frcTwin/pumplog/"+id+".json?orderBy=%22$key%22&startAt=%22"+d1+"T00%22&endAt=%22"+d2+"T23%22",12000)
   .then(function(r){return r.json();}).then(function(j){
     j=j||{};
-    var hrs=[],c1=0,c2=0,have=0;
-    for(var h=0;h<24;h++){
-      var k=dstr+"T"+((h<10?"0":"")+h);
-      var v=j[k]||null;hrs.push(v);
-      if(v){have++;if(v.p1===1)c1++;if(v.p2===1)c2++;}
-    }
-    if(!have){msg.textContent="ไม่มีบันทึกของวันนี้ (ต้องมีหน้าจอเปิดทิ้งไว้ถึงจะเก็บ)";document.getElementById("pView").innerHTML="";return;}
-    msg.textContent="มีบันทึก "+have+"/24 ชม. · P1 ทำงาน "+c1+" ชม. · P2 ทำงาน "+c2+" ชม.";
-    var strip=function(pn){
-      var s='<div style="display:flex;align-items:center;gap:8px;margin:6px 0"><span style="width:34px;font-size:12px;color:#8fb3cc;font-weight:700">'+pn.toUpperCase()+'</span><div style="display:flex;gap:2px;flex:1">';
-      hrs.forEach(function(v,h){
-        var st=(v&&v[pn]!=null)?v[pn]:null;
-        var c=st===1?"#16a34a":(st===0?"#334155":"#131c2b");
-        var t=(h<10?"0":"")+h+":00 — "+(st===1?"ทำงาน":(st===0?"หยุด":"ไม่มีข้อมูล"));
-        s+='<div title="'+t+'" style="flex:1;height:26px;border-radius:4px;background:'+c+';border:1px solid rgba(51,65,85,0.5)"></div>';
-      });
-      return s+'</div></div>';
-    };
-    var hourAxis='<div style="display:flex;gap:2px;margin-left:42px">'+hrs.map(function(_,h){return '<div style="flex:1;text-align:center;font-size:8.5px;color:#48596e;font-family:JetBrains Mono">'+(h%3===0?((h<10?"0":"")+h):"")+'</div>';}).join("")+'</div>';
-    document.getElementById("pView").innerHTML=strip("p1")+strip("p2")+hourAxis
-      +'<div style="font-size:10.5px;color:#48596e;margin-top:8px">🟩 ทำงาน · ⬛ หยุด · ช่องมืด = ไม่มีข้อมูล (ไม่มีหน้าจอเปิด/นอกวง intranet ช่วงนั้น)</div>';
-  }).catch(function(){msg.textContent="ดึงไม่สำเร็จ (เช็คอินเทอร์เน็ต/Firebase rules)";});
+    PUMP.recs=j;PUMP.label=META[id].code+"_"+d1+"_"+d2;
+    var days=daysBetween(d1,d2);
+    var agg=days.map(function(ds){
+      var h1=[],h2=[],have=0;
+      for(var h=0;h<24;h++){var k=ds+"T"+(h<10?"0":"")+h;var v=j[k];
+        h1.push(v&&v.p1!=null?v.p1:null);h2.push(v&&v.p2!=null?v.p2:null);if(v)have++;}
+      return {ds:ds,h1:h1,h2:h2,have:have,
+        c1:h1.filter(function(x){return x===1;}).length,
+        c2:h2.filter(function(x){return x===1;}).length};
+    });
+    var tot=agg.reduce(function(a,x){return a+x.have;},0);
+    if(!tot){msg.textContent="ไม่มีบันทึกช่วงนี้ (ต้องมีหน้าจอเปิด หรือ logger บน server ทำงานอยู่)";document.getElementById("pView").innerHTML="";return;}
+    msg.textContent="มีบันทึก "+tot+" ชม. ("+days.length+" วัน)";
+    document.getElementById("pCsv").disabled=false;
+    if(m==="d")renderPumpDay(agg[0]);else renderPumpDays(agg);
+  }).catch(function(){msg.textContent="ดึงไม่สำเร็จ (เช็คอินเทอร์เน็ต/rules)";});
+};
+function cell(st,label,tip){
+  var c=st===1?"#16a34a":(st===0?"#334155":"#131c2b");
+  var tx=st===1?"เดิน":(st===0?"หยุด":"");
+  return '<div title="'+tip+'" style="flex:1;min-width:0;height:34px;border-radius:5px;background:'+c+';border:1px solid rgba(51,65,85,0.5);display:flex;flex-direction:column;align-items:center;justify-content:center">'
+    +'<span style="font-size:8.5px;color:#7d93ab;font-family:JetBrains Mono">'+label+'</span>'
+    +(tx?'<span style="font-size:8px;color:'+(st===1?"#bbf7d0":"#64748b")+'">'+tx+'</span>':"")+'</div>';
+}
+function renderPumpDay(a){
+  var strip=function(hh,pn){
+    var s='<div style="display:flex;align-items:center;gap:8px;margin:7px 0"><span style="width:30px;font-size:12px;color:#8fb3cc;font-weight:700">'+pn+'</span><div style="display:flex;gap:3px;flex:1">';
+    hh.forEach(function(st,h){var hl=(h<10?"0":"")+h;s+=cell(st,hl,hl+":00 น. — "+(st===1?"ทำงาน":(st===0?"หยุด":"ไม่มีข้อมูล")));});
+    return s+'</div></div>';
+  };
+  document.getElementById("pView").innerHTML=
+    '<div style="font-size:12px;color:#67e8f9;margin-bottom:4px">'+a.ds+' · P1 ทำงาน '+a.c1+' ชม. ('+onRanges(a.h1)+') · P2 ทำงาน '+a.c2+' ชม. ('+onRanges(a.h2)+')</div>'
+    +strip(a.h1,"P1")+strip(a.h2,"P2")
+    +'<div style="font-size:10.5px;color:#48596e;margin-top:6px">🟩 ทำงาน · ⬛ หยุด · ช่องมืด = ไม่มีบันทึกชั่วโมงนั้น</div>';
+}
+function renderPumpDays(agg){
+  var bar=function(c,col){return '<div style="display:flex;align-items:center;gap:6px"><div style="width:110px;height:9px;background:#131c2b;border-radius:5px;overflow:hidden"><div style="width:'+(c/24*100)+'%;height:100%;background:'+col+'"></div></div><span style="font-family:JetBrains Mono;font-size:11.5px">'+c+' ชม.</span></div>';};
+  var h='<table style="width:100%"><thead><tr><th style="text-align:left">วันที่</th><th>บันทึก</th><th style="text-align:left">P1 ทำงาน</th><th style="text-align:left">ช่วง P1</th><th style="text-align:left">P2 ทำงาน</th><th style="text-align:left">ช่วง P2</th></tr></thead><tbody>';
+  agg.forEach(function(a){
+    if(!a.have)return;
+    h+='<tr><td style="color:#67e8f9;text-align:left;cursor:pointer" onclick="document.getElementById(\'pMode\').value=\'d\';pumpModeUI();document.getElementById(\'pDate\').value=\''+a.ds+'\';pumpLoad()">'+a.ds+'</td>'
+      +'<td style="font-family:JetBrains Mono">'+a.have+'/24</td>'
+      +'<td style="text-align:left">'+bar(a.c1,"#16a34a")+'</td><td style="text-align:left;font-family:JetBrains Mono;font-size:11px;color:#8fb3cc">'+onRanges(a.h1)+'</td>'
+      +'<td style="text-align:left">'+bar(a.c2,"#22d3ee")+'</td><td style="text-align:left;font-family:JetBrains Mono;font-size:11px;color:#8fb3cc">'+onRanges(a.h2)+'</td></tr>';
+  });
+  document.getElementById("pView").innerHTML=h+'</tbody></table><div style="font-size:10.5px;color:#48596e;margin-top:6px">คลิกวันที่เพื่อเจาะดูรายชั่วโมง</div>';
+}
+window.pumpCsv=function(){
+  if(!PUMP.recs)return;
+  var csv="\uFEFFdatetime,p1,p2\n";
+  Object.keys(PUMP.recs).sort().forEach(function(k){
+    var v=PUMP.recs[k];
+    csv+=k+":00,"+(v.p1!=null?v.p1:"")+","+(v.p2!=null?v.p2:"")+"\n";
+  });
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download="pumplog_"+PUMP.label+".csv";a.click();
 };
 // ===== ตัวบันทึกฝั่ง dashboard (สำรองกรณีหน้าแผนที่ไม่ได้เปิด) =====
 var pumpLogged=null;
