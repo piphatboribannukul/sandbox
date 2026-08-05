@@ -95,7 +95,9 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
       <button id="btn-dark" class="theme-btn active" onclick="setTheme('dark')">🌑 มืด</button>
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
     </div>
-    <a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
+    <a href="frc_chlorine.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(251,191,36,0.25);border-radius:20px;padding:6px 14px;font-size:11px;color:#fbbf24;text-decoration:none;font-weight:600">🧪 คลอรีน</a>
+<a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
+      <a href="#" onclick="openClPage();return false" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(250,204,21,0.28);border-radius:20px;padding:6px 14px;font-size:11px;color:#fde047;text-decoration:none;font-weight:600">🛢 ปริมาณคลอรีนคงเหลือ</a>
     
     <div class="badge"><div class="dot"></div><span>DEMO MODE</span></div>
   </div>
@@ -669,6 +671,8 @@ function ensureDetailDom(){
   if(document.getElementById("detailPage"))return;
   var st=document.createElement("style");
   st.textContent=
+    ".clblink{animation:clblink 0.9s infinite}",
+    "@keyframes clblink{50%{opacity:0.3}}",
     ".dp-wrap{position:fixed;inset:0;z-index:350;display:none;overflow:auto;font-family:'IBM Plex Sans Thai',sans-serif;background:linear-gradient(rgba(34,211,238,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,0.03) 1px,transparent 1px),radial-gradient(1100px 620px at 50% 24%,rgba(14,42,68,0.65),transparent 72%),#04070f;background-size:46px 46px,46px 46px,auto,auto}"
     +".dp-wrap.show{display:flex}"
     +".dp-inner{flex:1;width:100%;min-height:100vh;display:flex;flex-direction:column;padding:18px 36px 26px;position:relative}"
@@ -1147,7 +1151,97 @@ map.on("load",function(){
   setTimeout(function(){map.flyTo({center:[100.56,13.74],zoom:10.4,pitch:52,bearing:-14,duration:2600});},400);
 });
 setTimeout(hideLoading,4000);
-var cd=REFRESH;setInterval(function(){cd--;if(cd<=0){loadData();if(S.detailOpen)loadChlorineInfo(S.detailOpen);setTimeout(fbLogPumps,9000);cd=REFRESH;}},1000);
+
+// ================= เมนู: ปริมาณคลอรีนคงเหลือ =================
+var CL_INV={ // จำนวนถัง x ลิตร/ถัง + จุดสั่งเติม (ลิตร)
+  "9": {n:4,per:6000, thr:11000},  // ลาดพร้าว
+  "17":{n:4,per:6000, thr:11000},  // คลองเตย
+  "14":{n:4,per:6000, thr:11000},  // สำโรง
+  "5": {n:4,per:6000, thr:11000},  // ราษฎร์บูรณะ
+  "4": {n:4,per:6000, thr:11000},  // เพชรเกษม
+  "16":{n:4,per:6000, thr:11000},  // ท่าพระ
+  "20":{n:3,per:15000,thr:20000},  // มีนบุรี
+  "15":{n:4,per:6000, thr:11000},  // ลาดกระบัง
+  "19":{n:4,per:6000, thr:11000}   // บางพลี
+};
+var CL_ORDER=["9","17","14","5","4","16","20","15","19"];
+function ensureClDom(){
+  if(document.getElementById("clPage"))return;
+  var d=document.createElement("div");
+  d.id="clPage";d.className="dp-wrap";
+  d.innerHTML='<div style="max-width:1460px;margin:0 auto;padding:22px 28px 40px">'
+    +'<div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">'
+    +'<button onclick="closeClPage()" style="background:rgba(13,26,45,0.9);border:1px solid #2b4159;border-radius:10px;color:#c8d6e5;padding:8px 16px;font-family:IBM Plex Sans Thai;font-size:13px;cursor:pointer">← กลับแผนที่</button>'
+    +'<div><div style="font-size:20px;font-weight:700;color:#fde047">🛢 ปริมาณคลอรีนคงเหลือ (ถังเก็บคลอรีนน้ำ)</div>'
+    +'<div style="font-size:11.5px;color:#7d93ab;letter-spacing:0.14em">CHLORINE INVENTORY · 9 สถานี · อัปเดตทุก 60 วิ · แหล่งข้อมูล /api/chlorine-tank</div></div>'
+    +'<div id="clStamp" style="margin-left:auto;font-size:11.5px;color:#5b7089"></div></div>'
+    +'<div id="clGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:14px"></div>'
+    +'<div style="margin-top:14px;font-size:11px;color:#48596e">* สถานีที่ขึ้น "รอเชื่อมข้อมูล" = backend ระบบ wqc ยังไม่เชื่อมถังคลอรีนของสถานีนั้น (ขณะนี้เชื่อมแล้วเฉพาะบางสถานี) · จุดสั่งเติม: 11,000 ล. (มีนบุรี 20,000 ล.)</div>'
+    +'</div>';
+  document.body.appendChild(d);
+}
+function loadTanksAll(){
+  return Promise.all(CL_ORDER.map(function(id){
+    return fT(CHL_HOST+"/api/chlorine-tank/"+id,17000)
+      .then(function(r){if(!r.ok)throw 0;return r.json();})
+      .then(function(j){
+        var dd=(j&&j.data)||{};var st=S.stations[id];if(!st)return;
+        var nn=function(v){v=parseFloat(v);return isFinite(v)?v:null;};
+        st.tank={level:nn(dd.LEVEL),volume:nn(dd.VOLUMP),dose:nn(dd.FLOWRATE),cab:null,dosing:nn(dd.DOSING),inlet:nn(dd.INLETFLOW),dt:dd.timeDate||null};
+      }).catch(function(){});
+  })).then(renderClPage);
+}
+window.openClPage=function(){
+  ensureClDom();S.clOpen=true;
+  document.getElementById("clPage").classList.add("show");
+  renderClPage();loadTanksAll();
+};
+window.closeClPage=function(){
+  S.clOpen=false;
+  var d=document.getElementById("clPage");if(d)d.classList.remove("show");
+};
+window.clOrder=function(id){
+  var s=S.stations[id]||{};var inv=CL_INV[id];
+  var v=(s.tank&&s.tank.volume!=null)?Math.round(s.tank.volume).toLocaleString():"—";
+  alert("แจ้งสั่งเติมคลอรีน\n\nสถานี: "+(s.name||id)+" ("+(s.code||"")+")\nคงเหลือ: "+v+" ลิตร (จุดสั่งเติม "+inv.thr.toLocaleString()+" ลิตร)\nเวลา: "+new Date().toLocaleString("th-TH")+"\n\n* ขั้นนี้เป็นการแจ้งบนหน้าจอ — เชื่อมระบบแจ้งเตือน/บันทึกคำสั่งได้ภายหลัง");
+};
+function renderClPage(){
+  if(!S.clOpen)return;
+  var g=document.getElementById("clGrid");if(!g)return;
+  var stamp=null,low=0,ok=0,nod=0;
+  var cards=CL_ORDER.map(function(id){
+    var s=S.stations[id]||{},inv=CL_INV[id];
+    var cap=inv.n*inv.per;
+    var vol=(s.tank&&s.tank.volume!=null)?s.tank.volume:null;
+    if(s.tank&&s.tank.dt)stamp=s.tank.dt;
+    var pct=vol!=null?Math.max(0,Math.min(100,vol/cap*100)):0;
+    var thrPct=inv.thr/cap*100;
+    var isLow=(vol!=null&&vol<=inv.thr);
+    var near=(vol!=null&&!isLow&&vol<=inv.thr*1.25);
+    if(vol==null)nod++;else if(isLow)low++;else ok++;
+    var barColor=vol==null?"#1d2b3f":(isLow?"#ef4444":(near?"#f59e0b":"#22c55e"));
+    var chip=vol==null
+      ?'<span style="font-size:10.5px;color:#5b7089;border:1px solid #2b4159;border-radius:10px;padding:2px 9px">รอเชื่อมข้อมูล</span>'
+      :(isLow?'<span class="clblink" style="font-size:10.5px;color:#fecaca;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.5);border-radius:10px;padding:2px 9px">⚠ ถึงจุดสั่งเติม</span>'
+        :(near?'<span style="font-size:10.5px;color:#fde68a;border:1px solid rgba(245,158,11,0.45);border-radius:10px;padding:2px 9px">ใกล้จุดสั่งเติม</span>'
+              :'<span style="font-size:10.5px;color:#86efac;border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:2px 9px">ปกติ</span>'));
+    var h='<div style="background:rgba(10,20,36,0.85);border:1px solid '+(isLow?"rgba(239,68,68,0.55)":"#22344e")+';border-radius:14px;padding:14px 16px">';
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-weight:700;font-size:14.5px;color:#e8f2fb">'+(s.code||"")+' · '+(s.name||id)+'</span><span style="margin-left:auto">'+chip+'</span></div>';
+    // แถบถังแนวนอน + ขีดจุดเติม
+    h+='<div style="position:relative;height:34px;background:#0d1626;border:1px solid #24364f;border-radius:9px;overflow:hidden">';
+    h+='<div style="position:absolute;inset:0;width:'+pct.toFixed(1)+'%;background:linear-gradient(90deg,'+barColor+'cc,'+barColor+'88)"></div>';
+    h+='<div style="position:absolute;top:0;bottom:0;left:'+thrPct.toFixed(1)+'%;width:2px;background:#fbbf24;box-shadow:0 0 6px #fbbf24"></div>';
+    h+='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:JetBrains Mono,monospace;font-weight:700;font-size:14px;color:#f1f7ff;text-shadow:0 1px 3px #000">'+(vol!=null?Math.round(vol).toLocaleString()+" L":"—")+'</div>';
+    h+='</div>';
+    h+='<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7d93ab;margin-top:6px"><span>'+inv.n+' ถัง × '+inv.per.toLocaleString()+' ล. = ความจุ '+cap.toLocaleString()+' ล.</span><span style="color:#fbbf24">จุดสั่งเติม '+inv.thr.toLocaleString()+' ล.</span></div>';
+    if(vol!=null)h+='<div style="font-size:10.5px;color:#5b7089;margin-top:2px">คิดเป็น '+pct.toFixed(0)+'% ของความจุ'+(s.tank.dose!=null?' · จ่ายอยู่ '+s.tank.dose.toFixed(1)+' ล./ชม.':'')+'</div>';
+    if(isLow)h+='<button class="clblink" onclick="clOrder(\''+id+'\')" style="margin-top:10px;width:100%;background:linear-gradient(135deg,#dc2626,#b91c1c);border:1px solid #fca5a5;border-radius:10px;color:#fff;font-family:IBM Plex Sans Thai;font-weight:700;font-size:13.5px;padding:9px;cursor:pointer">🚨 สั่งเติมคลอรีน</button>';
+    return h+'</div>';
+  }).join("");
+  g.innerHTML=cards;
+  document.getElementById("clStamp").textContent=(stamp?("ข้อมูลถังล่าสุด "+stamp+" · "):"")+"เชื่อมแล้ว "+ok+" · ต้องเติม "+low+" · รอเชื่อม "+nod;
+}
+var cd=REFRESH;setInterval(function(){cd--;if(cd<=0){loadData();if(S.detailOpen)loadChlorineInfo(S.detailOpen);if(S.clOpen)loadTanksAll();setTimeout(fbLogPumps,9000);cd=REFRESH;}},1000);
 setTimeout(fbLogPumps,15000);
 }
 
