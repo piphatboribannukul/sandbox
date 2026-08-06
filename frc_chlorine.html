@@ -103,16 +103,17 @@ var WQC3="http://172.16.196.100:3000";
 function fT(u,ms){return Promise.race([fetch(u,{cache:"no-store"}),new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"));},ms||17000);})]);}
 function nf(v){v=parseFloat(v);return isFinite(v)?v:null;}
 function loadAll(){
-  var okc=0,i=0;
-  function nextTank(){
-    if(i>=IDS.length){
-      render();
-      document.getElementById("badge").textContent=okc>0?("● LIVE · เชื่อมได้ "+okc+"/9"):"◌ นอกวง intranet — แสดง \"—\" ทุกสถานี";
-      document.getElementById("badge").className="badge "+(okc>0?"b-live":"b-off");
-      return;
-    }
-    var id=IDS[i++];
-    fT(CHL_HOST+"/api/chlorine-tank/"+id,10000)
+  var okc=0,done=0,qi=0,LANES=3;
+  function fin(){
+    if(done<IDS.length)return;
+    render();
+    document.getElementById("badge").textContent=okc>0?("● LIVE · เชื่อมได้ "+okc+"/9"):"◌ นอกวง intranet — แสดง \"—\" ทุกสถานี";
+    document.getElementById("badge").className="badge "+(okc>0?"b-live":"b-off");
+  }
+  function worker(){
+    if(qi>=IDS.length)return;
+    var id=IDS[qi++];
+    fT(CHL_HOST+"/api/chlorine-tank/"+id,6000)
       .then(function(r){if(!r.ok)throw 0;return r.json();})
       .then(function(j){
         var d=(j&&j.data)||{};
@@ -120,32 +121,38 @@ function loadAll(){
         okc++;render();
       })
       .catch(function(){S.tanks[id]=S.tanks[id]&&S.tanks[id].vol!=null?S.tanks[id]:{vol:null};})
-      .then(nextTank);
+      .then(function(){done++;fin();worker();});
   }
-  nextTank();
+  for(var w=0;w<LANES;w++)worker();
 }
 function drawCharts(){
-  var W=1080,H=225,padL=52,padB=28,padT=18,cw=(W-padL-24)/IDS.length;
-  var vmax=1000;
-  IDS.forEach(function(id){var c=CFG[id],t=S.tanks[id]||{};vmax=Math.max(vmax,t.vol||0,c.th,c.n*c.size*0.6);});
-  vmax*=1.12;
-  var Y=function(v){return padT+(H-padT-padB)*(1-v/vmax);};
+  var W=1080,H=232,padL=52,padB=28,padT=18,cw=(W-padL-24)/IDS.length;
+  // หลอดสองชั้น: นอก=ความจุเต็ม ใน=คงเหลือ + ขีดเกณฑ์เติม
+  var tubeH=140,y0=34,tubeW=Math.min(64,cw*0.5);
   var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;font-family:JetBrains Mono">';
-  [0,0.25,0.5,0.75,1].forEach(function(f){var v=vmax*f;
-    s+='<line x1="'+padL+'" y1="'+Y(v)+'" x2="'+(W-12)+'" y2="'+Y(v)+'" stroke="#1b2a40"/>'
-      +'<text x="'+(padL-8)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="10" fill="#5b7089">'+Math.round(v/1000)+'k</text>';});
   IDS.forEach(function(id,i){
-    var c=CFG[id],t=S.tanks[id]||{},vol=t.vol,x=padL+i*cw,bw=cw*0.42;
+    var c=CFG[id],t=S.tanks[id]||{},vol=t.vol,cap=c.n*c.size;
+    var x=padL+i*cw+(cw-tubeW)/2;
+    var pct=(vol!=null)?Math.max(0,Math.min(1,vol/cap)):null;
     var isLow=(vol!=null&&vol<=c.th);
-    if(vol!=null){
-      s+='<rect x="'+(x+cw*0.29)+'" y="'+Y(vol)+'" width="'+bw+'" height="'+Math.max(1,Y(0)-Y(vol))+'" rx="3" fill="'+(isLow?"#f87171":"#38bdf8")+'"><title>'+c.code+' '+Math.round(vol).toLocaleString()+' ล.</title></rect>'
-        +'<text x="'+(x+cw*0.5)+'" y="'+(Y(vol)-5)+'" text-anchor="middle" font-size="10" fill="'+(isLow?"#fca5a5":"#9bd7ff")+'">'+(Math.round(vol/100)/10)+'k</text>';
-    }else s+='<text x="'+(x+cw*0.5)+'" y="'+(Y(0)-6)+'" text-anchor="middle" font-size="11" fill="#3a4a5e">—</text>';
-    s+='<line x1="'+(x+cw*0.16)+'" y1="'+Y(c.th)+'" x2="'+(x+cw*0.84)+'" y2="'+Y(c.th)+'" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/>'
-      +'<text x="'+(x+cw*0.5)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11.5" fill="#8fb3cc">'+c.code+'</text>';
+    // หลอดนอก (ความจุ)
+    s+='<rect x="'+x+'" y="'+y0+'" width="'+tubeW+'" height="'+tubeH+'" rx="9" fill="rgba(13,26,45,0.6)" stroke="#3a5570" stroke-width="2"/>';
+    // หลอดใน (คงเหลือ)
+    if(pct!=null&&pct>0){
+      var fh=Math.max(4,pct*(tubeH-6));
+      s+='<rect x="'+(x+3)+'" y="'+(y0+3+(tubeH-6-fh))+'" width="'+(tubeW-6)+'" height="'+fh+'" rx="6" fill="'+(isLow?"#f87171":"#38bdf8")+'" opacity="0.9"><title>'+c.code+' คงเหลือ '+Math.round(vol).toLocaleString()+' / '+cap.toLocaleString()+' ล.</title></rect>';
+    }
+    // ขีดเกณฑ์เติม
+    var ty=y0+3+(tubeH-6)*(1-c.th/cap);
+    s+='<line x1="'+(x-5)+'" y1="'+ty+'" x2="'+(x+tubeW+5)+'" y2="'+ty+'" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/>';
+    // ตัวเลข: คงเหลือ (บน) / ความจุ (ล่างใต้โค้ด)
+    s+='<text x="'+(x+tubeW/2)+'" y="'+(y0-9)+'" text-anchor="middle" font-size="12.5" font-weight="700" fill="'+(vol==null?"#3a4a5e":(isLow?"#fca5a5":"#7dd3fc"))+'">'+(vol!=null?(Math.round(vol/100)/10)+'k':'—')+'</text>'
+      +'<text x="'+(x+tubeW/2)+'" y="'+(y0+tubeH+18)+'" text-anchor="middle" font-size="11.5" fill="#8fb3cc">'+c.code+'</text>'
+      +'<text x="'+(x+tubeW/2)+'" y="'+(y0+tubeH+32)+'" text-anchor="middle" font-size="9.5" fill="#5b7089">/'+(cap/1000)+'k ล.</text>';
   });
-  s+='<line x1="'+(W-268)+'" y1="14" x2="'+(W-246)+'" y2="14" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/><text x="'+(W-240)+'" y="18" font-size="10.5" fill="#8fb3cc">เกณฑ์เติม (รายสถานี)</text>'
-   +'<rect x="'+(W-112)+'" y="8" width="12" height="12" rx="2" fill="#38bdf8"/><text x="'+(W-95)+'" y="18" font-size="10.5" fill="#8fb3cc">คงเหลือ</text>';
+  s+='<line x1="'+(W-268)+'" y1="14" x2="'+(W-246)+'" y2="14" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/><text x="'+(W-240)+'" y="18" font-size="10.5" fill="#8fb3cc">เกณฑ์เติม</text>'
+   +'<rect x="'+(W-158)+'" y="8" width="12" height="12" rx="3" fill="#38bdf8"/><text x="'+(W-141)+'" y="18" font-size="10.5" fill="#8fb3cc">คงเหลือ</text>'
+   +'<rect x="'+(W-70)+'" y="8" width="12" height="12" rx="3" fill="none" stroke="#3a5570" stroke-width="2"/><text x="'+(W-53)+'" y="18" font-size="10.5" fill="#8fb3cc">ความจุ</text>';
   document.getElementById("chartStock").innerHTML=s+'</svg>';
 
   var rmax=10;
