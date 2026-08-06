@@ -91,24 +91,38 @@ var CFG={
   "19":{code:"BP",name:"บางพลี",    n:4,size:6000, th:11000}
 };
 var IDS=Object.keys(CFG);
-var S={tanks:{},reco:{}};
+// k/area/flow ชุดเดียวกับหน้าแผนที่ (สำหรับสูตรแนะนำของระบบเรา)
+var M2={
+ "4":{area:10500,flow:12000,k:0.451},"16":{area:8120,flow:10000,k:0.44},
+ "5":{area:10025,flow:14000,k:0.094},"9":{area:13815,flow:16000,k:0.454},
+ "17":{area:8120,flow:9000,k:0.316},"14":{area:14081,flow:20000,k:2.652},
+ "20":{area:11961,flow:16000,k:0.627},"15":{area:9000,flow:10000,k:0.047},
+ "19":{area:11000,flow:22000,k:null}};
+var S={tanks:{},reco:{},live:{}};
 var WQC3="http://172.16.196.100:3000";
 function fT(u,ms){return Promise.race([fetch(u,{cache:"no-store"}),new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"));},ms||17000);})]);}
 function nf(v){v=parseFloat(v);return isFinite(v)?v:null;}
 function loadAll(){
-  var okc=0,done=0;
-  IDS.forEach(function(id){
-    fT(CHL_HOST+"/api/chlorine-tank/"+id,17000)
+  var okc=0,i=0;
+  function nextTank(){
+    if(i>=IDS.length){
+      render();
+      document.getElementById("badge").textContent=okc>0?("● LIVE · เชื่อมได้ "+okc+"/9"):"◌ นอกวง intranet — แสดง \"—\" ทุกสถานี";
+      document.getElementById("badge").className="badge "+(okc>0?"b-live":"b-off");
+      return;
+    }
+    var id=IDS[i++];
+    fT(CHL_HOST+"/api/chlorine-tank/"+id,10000)
       .then(function(r){if(!r.ok)throw 0;return r.json();})
       .then(function(j){
         var d=(j&&j.data)||{};
         S.tanks[id]={vol:nf(d.VOLUMP),level:nf(d.LEVEL),dose:nf(d.FLOWRATE),dt:d.timeDate||null};
-        okc++;
+        okc++;render();
       })
       .catch(function(){S.tanks[id]=S.tanks[id]&&S.tanks[id].vol!=null?S.tanks[id]:{vol:null};})
-      .then(function(){done++;if(done===IDS.length){render();
-        document.getElementById("badge").textContent=okc>0?("● LIVE · เชื่อมได้ "+okc+"/9"):"◌ นอกวง intranet — แสดง \"—\" ทุกสถานี";}});
-  });
+      .then(nextTank);
+  }
+  nextTank();
 }
 function drawCharts(){
   var W=1080,H=225,padL=52,padB=28,padT=18,cw=(W-padL-24)/IDS.length;
@@ -150,7 +164,7 @@ function drawCharts(){
     if(rc==null&&ds==null)s2+='<text x="'+(x+cw*0.5)+'" y="'+(Y2(0)-6)+'" text-anchor="middle" font-size="11" fill="#3a4a5e">—</text>';
     s2+='<text x="'+(x+cw*0.5)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11.5" fill="#8fb3cc">'+c.code+'</text>';
   });
-  s2+='<rect x="'+(W-262)+'" y="8" width="12" height="12" rx="2" fill="#fbbf24"/><text x="'+(W-245)+'" y="18" font-size="10.5" fill="#8fb3cc">อัตราแนะนำ (ระบบ wqc)</text>'
+  s2+='<rect x="'+(W-262)+'" y="8" width="12" height="12" rx="2" fill="#fbbf24"/><text x="'+(W-245)+'" y="18" font-size="10.5" fill="#8fb3cc">อัตราแนะนำ (สูตร+K ระบบเรา)</text>'
     +'<rect x="'+(W-112)+'" y="8" width="12" height="12" rx="2" fill="#38bdf8"/><text x="'+(W-95)+'" y="18" font-size="10.5" fill="#8fb3cc">อัตราจ่ายจริง</text>';
   document.getElementById("chartRate").innerHTML=s2+'</svg>';
 }
@@ -199,16 +213,40 @@ window.refill=function(id){
     navigator.clipboard.writeText(msg).then(function(){alert("คัดลอกข้อความแจ้งเติมแล้ว — นำไปวางใน LINE/อีเมลได้เลย\n\n"+msg);});
   }else alert(msg);
 };
+function tryF(pth,t1,t2){
+  return fT(WQC3+"/api"+pth,t1||8000).then(function(r){if(!r.ok)throw 0;return r.json();})
+    .catch(function(){return fT(CHL_HOST+"/api"+pth,t2||9000).then(function(r){if(!r.ok)throw 0;return r.json();});});
+}
 function loadReco(){
-  var done=0;
-  IDS.forEach(function(id){
-    fT(WQC3+"/api/chlorine/"+id,8000)
-      .then(function(r){if(!r.ok)throw 0;return r.json();})
-      .catch(function(){return fT(CHL_HOST+"/api/chlorine/"+id,9000).then(function(r){if(!r.ok)throw 0;return r.json();});})
-      .then(function(j){var v=(j&&j.data)||{};var rc=parseFloat(v.chlorine);if(isFinite(rc))S.reco[id]=Math.max(0,rc);})
-      .catch(function(){})
-      .then(function(){done++;if(done===IDS.length)render();});
-  });
+  // smartmap: ระดับ/Qin/จ่ายจริง ครบทุกสถานีในครั้งเดียว
+  fT("http://172.16.193.162/smartmap/data_station_real.php",9000)
+    .then(function(r){return r.json();}).catch(function(){return {};})
+    .then(function(sm){
+      var done=0;
+      IDS.forEach(function(id){
+        var code=CFG[id].code;
+        Promise.all([
+          tryF("/station/"+id).catch(function(){return null;}),
+          tryF("/chlorine/"+id).catch(function(){return null;})
+        ]).then(function(res){
+          var sc=(res[0]&&res[0].data&&res[0].data.scada&&res[0].data.scada[0])||{};
+          var c=(res[1]&&res[1].data)||{};
+          var m=M2[id]||{};
+          var frcIn=nf(sc.FREE_CL_INLET);if(frcIn!=null)frcIn/=100;
+          var fis=nf(sc.FLOW_INLET_STATION);
+          var qin=nf(sm[code+"_Qin"]),lvl=nf(sm[code+"_Level"]),fLive=nf(sm[code+"_F"]);
+          var target=nf(c.frc)||1,factor=nf(c.factor)||1,sg=nf(c.sg)||1.2;
+          var q=(qin!=null&&qin>0)?qin:((fis!=null&&fis>0)?fis:((fLive!=null&&fLive>0)?fLive:m.flow));
+          var t=((lvl!=null&&lvl>0?lvl:4.0)*(m.area||10000))/((fLive!=null&&fLive>0)?fLive:(m.flow||16000));
+          var k=(m.k!=null)?m.k:0;
+          if(frcIn!=null&&q!=null){
+            var rc=q*(target*Math.exp(k/24*t)-frcIn)*factor/(100*sg);
+            S.reco[id]=Math.max(0,Math.round(rc*10)/10);
+          }
+          done++;if(done===IDS.length)render();
+        });
+      });
+    });
 }
 render();loadAll();loadReco();
 setInterval(loadAll,REFRESH*1000);
