@@ -58,6 +58,7 @@ tr:hover td{background:rgba(34,211,238,0.05)}
   <div><h1>Dashboard ภาพรวมระบบจ่ายคลอรีนปลายสาย</h1><div class="sub">All-station overview • MWA Water Quality</div></div>
   <div class="nav">
     <a href="frc_deckgl.html">🗺 แผนที่</a>
+    <a href="frc_chlorine.html">🧪 คลอรีนคงเหลือ</a>
     <a href="frc_chlorine.html">🧪 คลอรีน</a>
     <a class="on" href="frc_dashboard.html">📊 Dashboard</a>
     <a href="#" onclick="window.close();setTimeout(function(){location.href='frc_deckgl.html';},200);return false;" style="border-color:rgba(248,113,113,0.35);color:#fca5a5">✕ ปิด</a>
@@ -510,8 +511,16 @@ window.pumpLoad=function(){
     if(d1>d2){var t=d1;d1=d2;d2=t;}}
   var msg=document.getElementById("pMsg");msg.textContent="กำลังดึง…";
   document.getElementById("pCsv").disabled=true;
+  var pumpFilter=function(j){var out={};Object.keys(j||{}).forEach(function(k){if(k>=d1+"T00"&&k<=d2+"T23")out[k]=j[k];});return out;};
   fT(FB_DB_URL+"/frcTwin/pumplog/"+id+".json?orderBy=%22$key%22&startAt=%22"+d1+"T00%22&endAt=%22"+d2+"T23%22",12000)
-  .then(function(r){return r.json();}).then(function(j){
+  .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+  .then(function(j){if(j&&j.error)throw new Error(j.error);return j||{};})
+  .catch(function(){ // query ล้ม -> ดึงทั้ง node ของสถานีแล้วกรองเองฝั่งเรา (กันทุก quirk ของ REST query)
+    return fT(FB_DB_URL+"/frcTwin/pumplog/"+id+".json",15000)
+      .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+      .then(function(j){if(j&&j.error)throw new Error(j.error);return pumpFilter(j);});
+  })
+  .then(function(j){
     j=j||{};
     PUMP.recs=j;PUMP.label=META[id].code+"_"+d1+"_"+d2;
     var days=daysBetween(d1,d2);
@@ -528,7 +537,7 @@ window.pumpLoad=function(){
     msg.textContent="มีบันทึก "+tot+" ชม. ("+days.length+" วัน)";
     document.getElementById("pCsv").disabled=false;
     if(m==="d")renderPumpDay(agg[0]);else renderPumpDays(agg);
-  }).catch(function(){msg.textContent="ดึงไม่สำเร็จ (เช็คอินเทอร์เน็ต/rules)";});
+  }).catch(function(e){msg.textContent="ดึงไม่สำเร็จ: "+(e&&e.message||e)+" — แคปข้อความนี้ส่งให้ผู้ดูแลได้เลย";});
 };
 function cell(st,label,tip){
   var c=st===1?"#16a34a":(st===0?"#334155":"#131c2b");
