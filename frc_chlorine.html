@@ -17,6 +17,9 @@ body{background:#0a1220;color:#c8d6e5;font-family:'IBM Plex Sans Thai',sans-seri
 #badge{font-family:'JetBrains Mono';font-size:10px;padding:5px 12px;border-radius:14px;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);color:#67e8f9}
 .wrap{max-width:1500px;margin:0 auto;padding:18px 22px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.cyl{flex:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,0.35))}
+.card{transition:transform .18s, box-shadow .18s}
+.card:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,0.4)}
 .chartcard{background:#0d1a2d;border:1px solid #223650;border-radius:16px;padding:14px 18px;margin-bottom:14px}
 .ctitle{font-size:13px;font-weight:700;color:#c8d6e5;margin-bottom:8px}
 .kpi{background:linear-gradient(160deg,#0e1a2e,#0b1524);border:1px solid rgba(45,64,89,0.6);border-radius:14px;padding:14px 18px}
@@ -70,7 +73,6 @@ body{background:#0a1220;color:#c8d6e5;font-family:'IBM Plex Sans Thai',sans-seri
     <div class="kpi"><div class="lb">เชื่อมข้อมูลได้</div><div class="v" id="kOn">—<span class="u"> / 9 สถานี</span></div></div>
     <div class="kpi"><div class="lb">อัปเดตล่าสุด</div><div class="v" id="kTime" style="font-size:16px">—</div></div>
   </div>
-  <div class="chartcard"><div class="ctitle">📊 ปริมาณคลอรีนคงเหลือใน Stock (ลิตร)</div><div id="chartStock"></div></div>
   <div class="chartcard"><div class="ctitle">📊 อัตราการจ่ายคลอรีนปลายสาย (ลิตร/ชั่วโมง)</div><div id="chartRate"></div></div>
   <div class="grid" id="grid"></div>
   <div class="foot">เกณฑ์เติม: 11,000 ลิตร (มีนบุรี 20,000 ลิตร) · ข้อมูลจาก /api/chlorine-tank (รีเฟรชทุก 60 วิ) · สถานีที่ขึ้น "รอเชื่อมข้อมูล" = backend ยังไม่ต่อระบบถังของสถานีนั้น</div>
@@ -127,33 +129,7 @@ function loadAll(){
 }
 function drawCharts(){
   var W=1080,H=232,padL=52,padB=28,padT=18,cw=(W-padL-24)/IDS.length;
-  // หลอดสองชั้น: นอก=ความจุเต็ม ใน=คงเหลือ + ขีดเกณฑ์เติม
-  var tubeH=140,y0=34,tubeW=Math.min(64,cw*0.5);
-  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;font-family:JetBrains Mono">';
-  IDS.forEach(function(id,i){
-    var c=CFG[id],t=S.tanks[id]||{},vol=t.vol,cap=c.n*c.size;
-    var x=padL+i*cw+(cw-tubeW)/2;
-    var pct=(vol!=null)?Math.max(0,Math.min(1,vol/cap)):null;
-    var isLow=(vol!=null&&vol<=c.th);
-    // หลอดนอก (ความจุ)
-    s+='<rect x="'+x+'" y="'+y0+'" width="'+tubeW+'" height="'+tubeH+'" rx="9" fill="rgba(13,26,45,0.6)" stroke="#3a5570" stroke-width="2"/>';
-    // หลอดใน (คงเหลือ)
-    if(pct!=null&&pct>0){
-      var fh=Math.max(4,pct*(tubeH-6));
-      s+='<rect x="'+(x+3)+'" y="'+(y0+3+(tubeH-6-fh))+'" width="'+(tubeW-6)+'" height="'+fh+'" rx="6" fill="'+(isLow?"#f87171":"#38bdf8")+'" opacity="0.9"><title>'+c.code+' คงเหลือ '+Math.round(vol).toLocaleString()+' / '+cap.toLocaleString()+' ล.</title></rect>';
-    }
-    // ขีดเกณฑ์เติม
-    var ty=y0+3+(tubeH-6)*(1-c.th/cap);
-    s+='<line x1="'+(x-5)+'" y1="'+ty+'" x2="'+(x+tubeW+5)+'" y2="'+ty+'" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/>';
-    // ตัวเลข: คงเหลือ (บน) / ความจุ (ล่างใต้โค้ด)
-    s+='<text x="'+(x+tubeW/2)+'" y="'+(y0-9)+'" text-anchor="middle" font-size="12.5" font-weight="700" fill="'+(vol==null?"#3a4a5e":(isLow?"#fca5a5":"#7dd3fc"))+'">'+(vol!=null?(Math.round(vol/100)/10)+'k':'—')+'</text>'
-      +'<text x="'+(x+tubeW/2)+'" y="'+(y0+tubeH+18)+'" text-anchor="middle" font-size="11.5" fill="#8fb3cc">'+c.code+'</text>'
-      +'<text x="'+(x+tubeW/2)+'" y="'+(y0+tubeH+32)+'" text-anchor="middle" font-size="9.5" fill="#5b7089">/'+(cap/1000)+'k ล.</text>';
-  });
-  s+='<line x1="'+(W-268)+'" y1="14" x2="'+(W-246)+'" y2="14" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/><text x="'+(W-240)+'" y="18" font-size="10.5" fill="#8fb3cc">เกณฑ์เติม</text>'
-   +'<rect x="'+(W-158)+'" y="8" width="12" height="12" rx="3" fill="#38bdf8"/><text x="'+(W-141)+'" y="18" font-size="10.5" fill="#8fb3cc">คงเหลือ</text>'
-   +'<rect x="'+(W-70)+'" y="8" width="12" height="12" rx="3" fill="none" stroke="#3a5570" stroke-width="2"/><text x="'+(W-53)+'" y="18" font-size="10.5" fill="#8fb3cc">ความจุ</text>';
-  document.getElementById("chartStock").innerHTML=s+'</svg>';
+
 
   var rmax=10;
   IDS.forEach(function(id){var t=S.tanks[id]||{};rmax=Math.max(rmax,S.reco[id]||0,t.dose||0);});
@@ -175,6 +151,37 @@ function drawCharts(){
     +'<rect x="'+(W-112)+'" y="8" width="12" height="12" rx="2" fill="#38bdf8"/><text x="'+(W-95)+'" y="18" font-size="10.5" fill="#8fb3cc">อัตราจ่ายจริง</text>';
   document.getElementById("chartRate").innerHTML=s2+'</svg>';
 }
+function tankSVG(has,pct,thPct,isLow,c){
+  var W=126,H=170,bx=22,bw=82,by=22,bh=118;
+  var fh=has?Math.max(0,Math.min(1,pct/100))*(bh-4):0;
+  var surfY=by+bh-2-fh;
+  var thY=by+bh-2-(thPct/100)*(bh-4);
+  var liquid=isLow?["#f87171","#b91c1c"]:["#fde68a","#d97706"];
+  var s='<svg class="cyl" viewBox="0 0 '+W+' '+H+'" width="126">'
+   +'<defs>'
+   +'<linearGradient id="gBody" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#16263e"/><stop offset="0.5" stop-color="#243a5c"/><stop offset="1" stop-color="#121f33"/></linearGradient>'
+   +'<linearGradient id="gLiq'+(isLow?'L':'N')+'" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="'+liquid[1]+'"/><stop offset="0.45" stop-color="'+liquid[0]+'"/><stop offset="1" stop-color="'+liquid[1]+'"/></linearGradient>'
+   +'</defs>'
+   // เงาพื้น
+   +'<ellipse cx="'+(bx+bw/2)+'" cy="'+(by+bh+14)+'" rx="'+(bw/2+8)+'" ry="7" fill="rgba(0,0,0,0.35)"/>'
+   // ตัวถัง
+   +'<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" fill="url(#gBody)" stroke="'+(has?'#3a5570':'#2b4159')+'" stroke-width="2"'+(has?'':' stroke-dasharray="6 4"')+' rx="4"/>';
+  if(has&&fh>1){
+    s+='<rect x="'+(bx+2)+'" y="'+surfY+'" width="'+(bw-4)+'" height="'+(fh)+'" fill="url(#gLiq'+(isLow?'L':'N')+')"/>'
+      +'<ellipse cx="'+(bx+bw/2)+'" cy="'+surfY+'" rx="'+(bw/2-2)+'" ry="6" fill="'+liquid[0]+'" opacity="0.95"/>'
+      +'<ellipse cx="'+(bx+bw/2-16)+'" cy="'+surfY+'" rx="12" ry="2.6" fill="#ffffff" opacity="0.35"/>';
+  }
+  // ขอบบนถัง (แก้ว)
+  s+='<ellipse cx="'+(bx+bw/2)+'" cy="'+by+'" rx="'+(bw/2)+'" ry="9" fill="#0e1a2c"/>' 
+   +'<ellipse cx="'+(bx+bw/2)+'" cy="'+by+'" rx="'+(bw/2)+'" ry="9" fill="none" stroke="'+(has?'#4a6a8f':'#2b4159')+'" stroke-width="2"/>'
+   // แสงข้างถัง
+   +'<rect x="'+(bx+8)+'" y="'+(by+8)+'" width="7" height="'+(bh-16)+'" rx="3.5" fill="#ffffff" opacity="0.06"/>'
+   // เส้นเกณฑ์เติม
+   +'<line x1="'+(bx-8)+'" y1="'+thY+'" x2="'+(bx+bw+8)+'" y2="'+thY+'" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/>'
+   +'<text x="'+(bx+bw+10)+'" y="'+(thY+4)+'" font-size="9.5" fill="#f87171" font-family="JetBrains Mono">'+(c.th/1000)+'k</text>';
+  if(!has)s+='<text x="'+(bx+bw/2)+'" y="'+(by+bh/2+6)+'" text-anchor="middle" font-size="20" fill="#3a4a5e">—</text>';
+  return s+'</svg>';
+}
 function render(){
   drawCharts();
   var total=0,low=0,on=0,html="";
@@ -191,11 +198,7 @@ function render(){
       +'<div class="nm">'+c.code+' — สจ.'+c.name+'</div>'
       +'<div class="cfg">'+c.n+' ถัง × '+c.size.toLocaleString()+' ล. = ความจุ '+cap.toLocaleString()+' ล.</div>'
       +'<div class="tankrow">'
-      +'<div class="tk'+(has?'':' nodata')+'">'
-        +(has?'<div class="fill" style="height:'+fillPct+'%"></div>':'')
-        +'<div class="thline" style="bottom:'+thPct+'%"></div>'
-        +'<div class="thlb" style="bottom:'+thPct+'%">'+(c.th/1000)+'k</div>'
-      +'</div>'
+      +tankSVG(has,fillPct,thPct,isLow,c)
       +'<div class="info">'
         +'<div class="big" style="color:'+col+'">'+(has?Math.round(vol).toLocaleString():"—")+'<span class="u"> ลิตร</span></div>'
         +'<div class="pct">'+(has?(fillPct.toFixed(0)+"% ของความจุ · เกณฑ์เติม "+c.th.toLocaleString()+" ล."):"เกณฑ์เติม "+c.th.toLocaleString()+" ล.")+'</div>'
@@ -225,35 +228,40 @@ function tryF(pth,t1,t2){
     .catch(function(){return fT(CHL_HOST+"/api"+pth,t2||9000).then(function(r){if(!r.ok)throw 0;return r.json();});});
 }
 function loadReco(){
-  // smartmap: ระดับ/Qin/จ่ายจริง ครบทุกสถานีในครั้งเดียว
-  fT("http://172.16.193.162/smartmap/data_station_real.php",9000)
-    .then(function(r){return r.json();}).catch(function(){return {};})
-    .then(function(sm){
-      var done=0;
-      IDS.forEach(function(id){
-        var code=CFG[id].code;
-        Promise.all([
-          tryF("/station/"+id).catch(function(){return null;}),
-          tryF("/chlorine/"+id).catch(function(){return null;})
-        ]).then(function(res){
-          var sc=(res[0]&&res[0].data&&res[0].data.scada&&res[0].data.scada[0])||{};
-          var c=(res[1]&&res[1].data)||{};
-          var m=M2[id]||{};
-          var frcIn=nf(sc.FREE_CL_INLET);if(frcIn!=null)frcIn/=100;
-          var fis=nf(sc.FLOW_INLET_STATION);
-          var qin=nf(sm[code+"_Qin"]),lvl=nf(sm[code+"_Level"]),fLive=nf(sm[code+"_F"]);
-          var target=nf(c.frc)||1,factor=nf(c.factor)||1,sg=nf(c.sg)||1.2;
-          var q=(qin!=null&&qin>0)?qin:((fis!=null&&fis>0)?fis:((fLive!=null&&fLive>0)?fLive:m.flow));
-          var t=((lvl!=null&&lvl>0?lvl:4.0)*(m.area||10000))/((fLive!=null&&fLive>0)?fLive:(m.flow||16000));
-          var k=(m.k!=null)?m.k:0;
-          if(frcIn!=null&&q!=null){
-            var rc=q*(target*Math.exp(k/24*t)-frcIn)*factor/(100*sg);
-            S.reco[id]=Math.max(0,Math.round(rc*10)/10);
-          }
-          done++;if(done===IDS.length)render();
-        });
+  var FBDB="https://wqcmap-7f9d2-default-rtdb.asia-southeast1.firebasedatabase.app";
+  Promise.all([
+    fT("http://172.16.193.162/smartmap/data_station_real.php",9000).then(function(r){return r.json();}).catch(function(){return {};}),
+    fT(FBDB+"/frcTwin/dose.json",9000).then(function(r){return r.json();}).catch(function(){return {};})
+  ]).then(function(res){
+    var sm=res[0]||{},DOSE=res[1]||{};
+    var done=0;
+    IDS.forEach(function(id){
+      var code=CFG[id].code;
+      Promise.all([
+        tryF("/station/"+id).catch(function(){return null;}),
+        tryF("/chlorine/"+id).catch(function(){return null;})
+      ]).then(function(r2){
+        var sc=(r2[0]&&r2[0].data&&r2[0].data.scada&&r2[0].data.scada[0])||{};
+        var c=(r2[1]&&r2[1].data)||{};
+        var m=M2[id]||{},dv=DOSE[id]||{};
+        var frcIn=nf(sc.FREE_CL_INLET);if(frcIn!=null)frcIn/=100;
+        var fis=nf(sc.FLOW_INLET_STATION);
+        var qin=nf(sm[code+"_Qin"]),lvl=nf(sm[code+"_Level"]),fLive=nf(sm[code+"_F"]);
+        // ลำดับเดียวกับหน้าสถานี: ค่าที่บันทึกไว้ > config ระบบ wqc > ค่าตั้งต้น
+        var target=(dv.target!=null)?dv.target:(nf(c.frc)||1);
+        var factor=(dv.factor!=null)?dv.factor:(nf(c.factor)||1);
+        var sg=(dv.sg!=null)?dv.sg:(nf(c.sg)||1.2);
+        var k=(dv.k!=null)?dv.k:((m.k!=null)?m.k:0);
+        var q=(qin!=null&&qin>0)?qin:((fis!=null&&fis>0)?fis:((fLive!=null&&fLive>0)?fLive:m.flow));
+        var t=((lvl!=null&&lvl>0?lvl:4.0)*(m.area||10000))/((fLive!=null&&fLive>0)?fLive:(m.flow||16000));
+        if(frcIn!=null&&q!=null){
+          var rc=q*(target*Math.exp(k/24*t)-frcIn)*factor/(100*sg);
+          S.reco[id]=Math.max(0,Math.round(rc*10)/10);
+        }
+        done++;if(done===IDS.length)render();
       });
     });
+  });
 }
 render();loadAll();loadReco();
 setInterval(loadAll,REFRESH*1000);
