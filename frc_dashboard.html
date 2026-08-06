@@ -479,7 +479,8 @@ window.histCsv=function(){
 (function(){
   var sel=document.getElementById("pSt");
   sel.innerHTML=IDS.map(function(id){return '<option value="'+id+'">'+META[id].code+' — '+META[id].name+'</option>';}).join("");
-  var today=new Date().toISOString().slice(0,10);
+  var _n=new Date(),_p=function(n){return (n<10?"0":"")+n;};
+  var today=_n.getFullYear()+"-"+_p(_n.getMonth()+1)+"-"+_p(_n.getDate());
   document.getElementById("pDate").value=today;
   document.getElementById("pMonth").value=today.slice(0,7);
   document.getElementById("pD1").value=today;
@@ -493,7 +494,8 @@ window.pumpModeUI=function(){
 };
 var PUMP={recs:null,label:""};
 function daysBetween(a,b){var out=[],d=new Date(a+"T00:00:00");var end=new Date(b+"T00:00:00");
-  while(d<=end&&out.length<62){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}return out;}
+  var p2=function(n){return (n<10?"0":"")+n;};
+  while(d<=end&&out.length<92){out.push(d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate()));d.setDate(d.getDate()+1);}return out;}
 function onRanges(hh){ // [0,1,1,1,0,...] -> "01–03"
   var out=[],st=null;
   for(var h=0;h<=24;h++){var v=h<24&&hh[h]===1;
