@@ -611,6 +611,17 @@ function renderRanking(){
   }).join("");
 }
 
+// คลิกสำรอง: จับคลิกซ้ำใส่สถานีที่เลือกอยู่ แม้กล้องกำลังเคลื่อน (จิ้มพลาดไอคอนก็เข้าได้)
+map.on("click",function(e){
+  try{
+    var id=S.selectedId;
+    if(!id||S.detailOpen||!S.stations[id])return;
+    var c=META[id].coord;
+    var p=map.project({lng:c[0],lat:c[1]});
+    var dx=e.point.x-p.x,dy=e.point.y-p.y;
+    if(dx*dx+dy*dy<=70*70){clearTimeout(S._selT);openDetail(id);}
+  }catch(err){}
+});
 window.selectStation=function(id){
   if(S.selectedId===id&&S.stations[id]){clearTimeout(S._selT);openDetail(id);return;}
   S.selectedId=id;
@@ -619,7 +630,7 @@ window.selectStation=function(id){
   S.simFlow=(st&&st.flowLive)?Math.min(30000,Math.max(2000,Math.round(st.flowLive/500)*500)):META[id].flow;
   clearTimeout(S._selT);
   S._selT=setTimeout(function(){ // หน่วงสั้นๆ: ถ้าคลิกซ้ำมาทัน ไอคอนยังอยู่ที่เดิม -> เข้าหน้าสถานีชัวร์
-    map.flyTo({center:[META[id].coord[0],META[id].coord[1]-0.004],zoom:14.4,pitch:60,bearing:-18,duration:1600});
+    map.flyTo({center:[META[id].coord[0],META[id].coord[1]-0.004],zoom:14.4,pitch:60,bearing:-18,duration:800});
     renderInfo();
   },260);
 };
