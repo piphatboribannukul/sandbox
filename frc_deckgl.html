@@ -1192,18 +1192,24 @@ setTimeout(fbLogPumps,15000);
       box.appendChild(d);
       setTimeout(function(){try{d.remove();}catch(e){}},8000);
     };
-    window.onerror=function(m,src,line){dbg('❌ ERROR: '+m+' (บรรทัด '+line+')',1);};
+    window.onerror=function(m,src,line){
+      var f=(src||'').split('/').pop()||'?';
+      dbg('❌ ERROR: '+m+' @ '+f+':'+line,1);
+    };
     var _sel=window.selectStation;
     window.selectStation=function(id){
-      dbg('🖱 คลิกสถานี '+id+' · ก่อนหน้าเลือก: '+(S.selectedId||'—')+' · มีข้อมูล: '+(S.stations[id]?'มี':'ไม่มี'));
-      return _sel(id);
+      var st=window.__S||{};
+      dbg('🖱 คลิกสถานี '+id+' · ก่อนหน้าเลือก: '+((st.selectedId)||'—')+' · มีข้อมูล: '+((st.stations&&st.stations[id])?'มี':'ไม่มี'));
+      try{return _sel(id);}
+      catch(e){dbg('❌ selectStation ชั้นใน: '+e.message+'\n'+String(e.stack||'').split('\n')[1],1);throw e;}
     };
     var _open=window.openDetail;
     window.openDetail=function(id){
       dbg('▶ openDetail('+id+') ถูกเรียก');
-      try{var r=_open(id);dbg('✅ สั่งแสดงหน้าสถานีแล้ว — ถ้าจอไม่เปลี่ยน = ปัญหาการแสดงผล');return r;}
-      catch(e){dbg('❌ openDetail พัง: '+e.message,1);throw e;}
+      try{var r=_open(id);dbg('✅ สั่งแสดงหน้าสถานีแล้ว');return r;}
+      catch(e){dbg('❌ openDetail ชั้นใน: '+e.message+'\n'+String(e.stack||'').split('\n')[1],1);throw e;}
     };
+    dbg('scope check: typeof __S='+(typeof window.__S)+' · openDetail='+(typeof _open)+' · selectStation='+(typeof _sel));
     dbg('🔧 DEBUG BUILD — คลิก/แตะสถานี แล้วอ่านข้อความที่เด้งตรงนี้');
   }catch(e){}
 })();
