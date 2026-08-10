@@ -20,6 +20,15 @@ body{background:#0a1220;color:#c8d6e5;font-family:'IBM Plex Sans Thai',sans-seri
 .cyl{flex:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,0.35))}
 .card{transition:transform .18s, box-shadow .18s}
 .card:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,0.4)}
+@media(max-width:640px){
+  body{padding:10px 12px}
+  header{gap:8px}
+  h1{font-size:15px}
+  nav{width:100%;justify-content:flex-start;flex-wrap:wrap;margin-left:0}
+  .kpis{grid-template-columns:1fr 1fr}
+  .card{padding:12px}
+  .tankrow{flex-wrap:wrap;justify-content:center}
+}
 .chartcard{background:#0d1a2d;border:1px solid #223650;border-radius:16px;padding:14px 18px;margin-bottom:14px}
 .ctitle{font-size:13px;font-weight:700;color:#c8d6e5;margin-bottom:8px}
 .kpi{background:linear-gradient(160deg,#0e1a2e,#0b1524);border:1px solid rgba(45,64,89,0.6);border-radius:14px;padding:14px 18px}

@@ -66,6 +66,17 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
 .formula{font-size:9px;color:#5b7089;background:rgba(20,31,51,0.6);border-radius:8px;padding:6px 9px;margin-top:6px}
 
 .legend{position:fixed;bottom:16px;left:16px;z-index:10;padding:10px 13px;font-size:10px}
+/* ===== มือถือ ===== */
+@media(max-width:640px){
+  .rank-panel{display:none}
+  .legend{display:none}
+  .header{padding:8px 10px;flex-wrap:wrap;gap:6px}
+  .header h1,.header .title{font-size:13px!important}
+  .header .sub{display:none}
+  .info-panel{top:auto;bottom:0;left:0;right:0;width:100vw;max-height:62vh;border-radius:18px 18px 0 0;padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
+  .dp-wrap{padding:8px}
+  .dp-head{flex-wrap:wrap;gap:8px}
+}
 .legend-item{display:flex;align-items:center;gap:7px;margin:3px 0}
 .legend-dot{width:9px;height:9px;border-radius:3px;box-shadow:0 0 6px currentColor}
 .legend-line{width:15px;height:3px;border-radius:2px;box-shadow:0 0 5px currentColor}
@@ -95,7 +106,8 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
       <button id="btn-dark" class="theme-btn active" onclick="setTheme('dark')">🌑 มืด</button>
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
     </div>
-    <a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
+    <a href="frc_chlorine.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(251,191,36,0.25);border-radius:20px;padding:6px 14px;font-size:11px;color:#fbbf24;text-decoration:none;font-weight:600">🧪 คลอรีนคงเหลือ</a>
+<a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
     
     <div class="badge"><div class="dot"></div><span>DEMO MODE</span></div>
   </div>
@@ -280,7 +292,7 @@ function mkMapStyle(theme){
     ]};
 }
 
-const map=new maplibregl.Map({
+const map=new maplibregl.Map({doubleClickZoom:false,
   container:"map",style:mkMapStyle("dark"),
   center:[100.55,13.75],zoom:8.8,pitch:0,bearing:0,maxPitch:70,antialias:true,
   maxBounds:[[100.20,13.40],[101.02,14.10]],maxTileCacheSize:200
@@ -610,14 +622,28 @@ function renderRanking(){
   }).join("");
 }
 
+// คลิกสำรอง: จับคลิกซ้ำใส่สถานีที่เลือกอยู่ แม้กล้องกำลังเคลื่อน (จิ้มพลาดไอคอนก็เข้าได้)
+map.on("click",function(e){
+  try{
+    var id=S.selectedId;
+    if(!id||S.detailOpen||!S.stations[id])return;
+    var c=META[id].coord;
+    var p=map.project({lng:c[0],lat:c[1]});
+    var dx=e.point.x-p.x,dy=e.point.y-p.y;
+    if(dx*dx+dy*dy<=70*70){clearTimeout(S._selT);openDetail(id);}
+  }catch(err){}
+});
 window.selectStation=function(id){
-  if(S.selectedId===id&&S.stations[id]){openDetail(id);return;}
+  if(S.selectedId===id&&S.stations[id]){clearTimeout(S._selT);openDetail(id);return;}
   S.selectedId=id;
   var st=S.stations[id];
   S.simLevel=(st&&st.level)?Math.round(st.level*10)/10:4.0;
   S.simFlow=(st&&st.flowLive)?Math.min(30000,Math.max(2000,Math.round(st.flowLive/500)*500)):META[id].flow;
-  map.flyTo({center:[META[id].coord[0],META[id].coord[1]-0.004],zoom:14.4,pitch:60,bearing:-18,duration:1600});
-  renderInfo();
+  clearTimeout(S._selT);
+  S._selT=setTimeout(function(){ // หน่วงสั้นๆ: ถ้าคลิกซ้ำมาทัน ไอคอนยังอยู่ที่เดิม -> เข้าหน้าสถานีชัวร์
+    map.flyTo({center:[META[id].coord[0],META[id].coord[1]-0.004],zoom:14.4,pitch:60,bearing:-18,duration:800});
+    renderInfo();
+  },260);
 };
 
 function renderInfo(){
@@ -669,6 +695,8 @@ function ensureDetailDom(){
   if(document.getElementById("detailPage"))return;
   var st=document.createElement("style");
   st.textContent=
+    ".clblink{animation:clblink 0.9s infinite}",
+    "@keyframes clblink{50%{opacity:0.3}}",
     ".dp-wrap{position:fixed;inset:0;z-index:350;display:none;overflow:auto;font-family:'IBM Plex Sans Thai',sans-serif;background:linear-gradient(rgba(34,211,238,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,0.03) 1px,transparent 1px),radial-gradient(1100px 620px at 50% 24%,rgba(14,42,68,0.65),transparent 72%),#04070f;background-size:46px 46px,46px 46px,auto,auto}"
     +".dp-wrap.show{display:flex}"
     +".dp-inner{flex:1;width:100%;min-height:100vh;display:flex;flex-direction:column;padding:18px 36px 26px;position:relative}"
@@ -1147,6 +1175,7 @@ map.on("load",function(){
   setTimeout(function(){map.flyTo({center:[100.56,13.74],zoom:10.4,pitch:52,bearing:-14,duration:2600});},400);
 });
 setTimeout(hideLoading,4000);
+
 var cd=REFRESH;setInterval(function(){cd--;if(cd<=0){loadData();if(S.detailOpen)loadChlorineInfo(S.detailOpen);setTimeout(fbLogPumps,9000);cd=REFRESH;}},1000);
 setTimeout(fbLogPumps,15000);
 }
