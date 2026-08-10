@@ -74,6 +74,7 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
   .header h1,.header .title{font-size:13px!important}
   .header .sub{display:none}
   .info-panel{top:auto;bottom:0;left:0;right:0;width:100vw;max-height:62vh;border-radius:18px 18px 0 0;padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
+  .open-st-btn{display:block!important;text-align:center;font-size:14px!important;padding:11px!important;margin-top:10px;background:rgba(34,211,238,0.14);font-weight:700}
   .dp-wrap{padding:8px}
   .dp-head{flex-wrap:wrap;gap:8px}
 }
@@ -637,7 +638,7 @@ function renderInfo(){
   var panel=document.getElementById("infoPanel");panel.classList.add("show");
   var kd=s.kHist,canCalc=kd&&kd>0;
   var srcName={MTR:"สูบส่งมหาสวัสดิ์ (MTR)",TR1:"สูบส่งบางเขน 1 (TR1)",TR2:"สูบส่งบางเขน 2 (TR2)",TR3:"สูบส่งบางเขน 3 (TR3)"}[s.src]||s.src||"—";
-  var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
+  var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span class="open-st-btn" style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
     '<div class="stat-row"><span class="stat-label">เติมคลอรีนเสริม (จาก FRC)</span><span class="stat-value mono" style="color:'+(s.dosing?"#a78bfa":"#7d93ab")+'">'+(s.dosing?"มี (Booster)":"ไม่มี")+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">ปั๊มดึงน้ำเข้าเครื่องวัด</span><span class="stat-value mono">P1 '+(s.p1===1?"✓":(s.p1===0?"✗":"—"))+' · P2 '+(s.p2===1?"✓":(s.p2===0?"✗":"—"))+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">สถานะการจ่าย</span><span class="stat-value mono" style="color:'+(s.bypass?"#fbbf24":"#34d399")+'">'+(s.bypass?"\u21c4 BYPASS ไม่ผ่านถัง":"ปกติ ผ่านถังน้ำใส")+'</span></div>'+
