@@ -1177,6 +1177,36 @@ setTimeout(fbLogPumps,15000);
   setTimeout(function(){waitLib(n+1);},100);
 })(0);
 
+
+// ===== 🔧 DEBUG OVERLAY (ชั่วคราว — ถอดออกได้ภายหลัง) =====
+(function(){
+  try{
+    var box=document.createElement('div');
+    box.id='dbgBox';
+    box.style.cssText='position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:92vw;align-items:center';
+    document.body.appendChild(box);
+    window.dbg=function(msg,err){
+      var d=document.createElement('div');
+      d.textContent=msg;
+      d.style.cssText='background:'+(err?'rgba(185,28,28,0.93)':'rgba(8,145,178,0.93)')+';color:#fff;font:12.5px \'IBM Plex Sans Thai\',sans-serif;padding:7px 14px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.45);white-space:pre-wrap;text-align:center';
+      box.appendChild(d);
+      setTimeout(function(){try{d.remove();}catch(e){}},8000);
+    };
+    window.onerror=function(m,src,line){dbg('❌ ERROR: '+m+' (บรรทัด '+line+')',1);};
+    var _sel=window.selectStation;
+    window.selectStation=function(id){
+      dbg('🖱 คลิกสถานี '+id+' · ก่อนหน้าเลือก: '+(S.selectedId||'—')+' · มีข้อมูล: '+(S.stations[id]?'มี':'ไม่มี'));
+      return _sel(id);
+    };
+    var _open=window.openDetail;
+    window.openDetail=function(id){
+      dbg('▶ openDetail('+id+') ถูกเรียก');
+      try{var r=_open(id);dbg('✅ สั่งแสดงหน้าสถานีแล้ว — ถ้าจอไม่เปลี่ยน = ปัญหาการแสดงผล');return r;}
+      catch(e){dbg('❌ openDetail พัง: '+e.message,1);throw e;}
+    };
+    dbg('🔧 DEBUG BUILD — คลิก/แตะสถานี แล้วอ่านข้อความที่เด้งตรงนี้');
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
