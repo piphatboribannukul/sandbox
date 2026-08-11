@@ -66,6 +66,18 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
 .formula{font-size:9px;color:#5b7089;background:rgba(20,31,51,0.6);border-radius:8px;padding:6px 9px;margin-top:6px}
 
 .legend{position:fixed;bottom:16px;left:16px;z-index:10;padding:10px 13px;font-size:10px}
+/* ===== มือถือ ===== */
+@media(max-width:640px){
+  .rank-panel{display:none}
+  .legend{display:none}
+  .header{padding:8px 10px;flex-wrap:wrap;gap:6px}
+  .header h1,.header .title{font-size:13px!important}
+  .header .sub{display:none}
+  .info-panel{top:auto;bottom:0;left:0;right:0;width:100vw;max-height:62vh;border-radius:18px 18px 0 0;padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
+  .open-st-btn{display:block!important;text-align:center;font-size:14px!important;padding:11px!important;margin-top:10px;background:rgba(34,211,238,0.14);font-weight:700}
+  .dp-wrap{padding:8px}
+  .dp-head{flex-wrap:wrap;gap:8px}
+}
 .legend-item{display:flex;align-items:center;gap:7px;margin:3px 0}
 .legend-dot{width:9px;height:9px;border-radius:3px;box-shadow:0 0 6px currentColor}
 .legend-line{width:15px;height:3px;border-radius:2px;box-shadow:0 0 5px currentColor}
@@ -95,7 +107,8 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
       <button id="btn-dark" class="theme-btn active" onclick="setTheme('dark')">🌑 มืด</button>
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
     </div>
-    <a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
+    <a href="frc_chlorine.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(251,191,36,0.25);border-radius:20px;padding:6px 14px;font-size:11px;color:#fbbf24;text-decoration:none;font-weight:600">🧪 คลอรีนคงเหลือ</a>
+<a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
     
     <div class="badge"><div class="dot"></div><span>DEMO MODE</span></div>
   </div>
@@ -611,7 +624,7 @@ function renderRanking(){
 }
 
 window.selectStation=function(id){
-  if(S.selectedId===id&&S.stations[id]){openDetail(id);return;}
+  if(S.selectedId===id&&S.stations[id]){if(window.dbg)dbg('↪ คลิกซ้ำสถานีเดิม → เรียก openDetail');openDetail(id);return;}
   S.selectedId=id;
   var st=S.stations[id];
   S.simLevel=(st&&st.level)?Math.round(st.level*10)/10:4.0;
@@ -625,7 +638,7 @@ function renderInfo(){
   var panel=document.getElementById("infoPanel");panel.classList.add("show");
   var kd=s.kHist,canCalc=kd&&kd>0;
   var srcName={MTR:"สูบส่งมหาสวัสดิ์ (MTR)",TR1:"สูบส่งบางเขน 1 (TR1)",TR2:"สูบส่งบางเขน 2 (TR2)",TR3:"สูบส่งบางเขน 3 (TR3)"}[s.src]||s.src||"—";
-  var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
+  var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span class="open-st-btn" style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
     '<div class="stat-row"><span class="stat-label">เติมคลอรีนเสริม (จาก FRC)</span><span class="stat-value mono" style="color:'+(s.dosing?"#a78bfa":"#7d93ab")+'">'+(s.dosing?"มี (Booster)":"ไม่มี")+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">ปั๊มดึงน้ำเข้าเครื่องวัด</span><span class="stat-value mono">P1 '+(s.p1===1?"✓":(s.p1===0?"✗":"—"))+' · P2 '+(s.p2===1?"✓":(s.p2===0?"✗":"—"))+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">สถานะการจ่าย</span><span class="stat-value mono" style="color:'+(s.bypass?"#fbbf24":"#34d399")+'">'+(s.bypass?"\u21c4 BYPASS ไม่ผ่านถัง":"ปกติ ผ่านถังน้ำใส")+'</span></div>'+
@@ -669,6 +682,8 @@ function ensureDetailDom(){
   if(document.getElementById("detailPage"))return;
   var st=document.createElement("style");
   st.textContent=
+    ".clblink{animation:clblink 0.9s infinite}",
+    "@keyframes clblink{50%{opacity:0.3}}",
     ".dp-wrap{position:fixed;inset:0;z-index:350;display:none;overflow:auto;font-family:'IBM Plex Sans Thai',sans-serif;background:linear-gradient(rgba(34,211,238,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,0.03) 1px,transparent 1px),radial-gradient(1100px 620px at 50% 24%,rgba(14,42,68,0.65),transparent 72%),#04070f;background-size:46px 46px,46px 46px,auto,auto}"
     +".dp-wrap.show{display:flex}"
     +".dp-inner{flex:1;width:100%;min-height:100vh;display:flex;flex-direction:column;padding:18px 36px 26px;position:relative}"
@@ -721,16 +736,25 @@ function ensureDetailDom(){
   document.addEventListener("keydown",function(e){if(e.key==="Escape")closeDetail();});
 }
 function openDetail(id){
-  ensureDetailDom();
-  S.detailOpen=id;
-  if(!S.dose||S.dose.src!==id){
-    S.dose={target:null,factor:null,sg:null,frcin:null,k:null,t:null,q:null,auto:(S.dose&&S.dose.auto===false)?false:true,src:id};
-    S.doseTouched=false;
+  try{
+    if(window.dbg)dbg('▶ openDetail('+id+') เริ่ม');
+    ensureDetailDom();
+    S.detailOpen=id;
+    if(!S.dose||S.dose.src!==id){
+      S.dose={target:null,factor:null,sg:null,frcin:null,k:null,t:null,q:null,auto:(S.dose&&S.dose.auto===false)?false:true,src:id};
+      S.doseTouched=false;
+    }
+    renderDetail(id);
+    fbLoadDose(id);
+    loadChlorineInfo(id);
+    var _dp=document.getElementById("detailPage");
+    _dp.classList.add("show");
+    _dp.style.display="flex";_dp.style.zIndex="99998"; // บังคับกันโดน CSS อื่นกด
+    if(window.dbg){try{var _cs=getComputedStyle(_dp);dbg('✅ openDetail สำเร็จ · display='+_cs.display+' · z='+_cs.zIndex+' · ลูก='+_dp.children.length+' · สูง='+Math.round(_dp.getBoundingClientRect().height));}catch(e2){}}
+  }catch(e){
+    if(window.dbg)dbg('❌ openDetail ตายที่: '+e.message+'\n'+String(e.stack||'').split('\n')[1],1);
+    throw e;
   }
-  renderDetail(id);
-  fbLoadDose(id);
-  loadChlorineInfo(id);
-  document.getElementById("detailPage").classList.add("show");
 }
 function closeDetail(){
   S.detailOpen=null;
@@ -1147,6 +1171,7 @@ map.on("load",function(){
   setTimeout(function(){map.flyTo({center:[100.56,13.74],zoom:10.4,pitch:52,bearing:-14,duration:2600});},400);
 });
 setTimeout(hideLoading,4000);
+
 var cd=REFRESH;setInterval(function(){cd--;if(cd<=0){loadData();if(S.detailOpen)loadChlorineInfo(S.detailOpen);setTimeout(fbLogPumps,9000);cd=REFRESH;}},1000);
 setTimeout(fbLogPumps,15000);
 }
@@ -1161,6 +1186,42 @@ setTimeout(fbLogPumps,15000);
   setTimeout(function(){waitLib(n+1);},100);
 })(0);
 
+
+// ===== 🔧 DEBUG OVERLAY (ชั่วคราว — ถอดออกได้ภายหลัง) =====
+(function(){
+  try{
+    var box=document.createElement('div');
+    box.id='dbgBox';
+    box.style.cssText='position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:92vw;align-items:center';
+    document.body.appendChild(box);
+    window.dbg=function(msg,err){
+      var d=document.createElement('div');
+      d.textContent=msg;
+      d.style.cssText='background:'+(err?'rgba(185,28,28,0.93)':'rgba(8,145,178,0.93)')+';color:#fff;font:12.5px \'IBM Plex Sans Thai\',sans-serif;padding:7px 14px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.45);white-space:pre-wrap;text-align:center';
+      box.appendChild(d);
+      setTimeout(function(){try{d.remove();}catch(e){}},8000);
+    };
+    window.onerror=function(m,src,line){
+      var f=(src||'').split('/').pop()||'?';
+      dbg('❌ ERROR: '+m+' @ '+f+':'+line,1);
+    };
+    var _sel=window.selectStation;
+    window.selectStation=function(id){
+      var st=window.__S||{};
+      dbg('🖱 คลิกสถานี '+id+' · ก่อนหน้าเลือก: '+((st.selectedId)||'—')+' · มีข้อมูล: '+((st.stations&&st.stations[id])?'มี':'ไม่มี'));
+      try{return _sel(id);}
+      catch(e){dbg('❌ selectStation ชั้นใน: '+e.message+'\n'+String(e.stack||'').split('\n')[1],1);throw e;}
+    };
+    var _open=window.openDetail;
+    window.openDetail=function(id){
+      dbg('▶ openDetail('+id+') ถูกเรียก');
+      try{var r=_open(id);dbg('✅ สั่งแสดงหน้าสถานีแล้ว');return r;}
+      catch(e){dbg('❌ openDetail ชั้นใน: '+e.message+'\n'+String(e.stack||'').split('\n')[1],1);throw e;}
+    };
+    dbg('scope check: typeof __S='+(typeof window.__S)+' · openDetail='+(typeof _open)+' · selectStation='+(typeof _sel));
+    dbg('🔧 DEBUG BUILD — คลิก/แตะสถานี แล้วอ่านข้อความที่เด้งตรงนี้');
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
