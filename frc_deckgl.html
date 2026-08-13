@@ -797,6 +797,20 @@ function fbLoadDose(id){
   }).catch(function(){});
 }
 
+var REST113="http://172.16.183.113/restData";
+var HAS113={SR:1,KT:1,PK:1,TP:1,RB:1};
+function parse113(code,j){
+  if(!j)return null;
+  var nn=function(v){v=parseFloat(v);return isFinite(v)?v:null;};
+  var vol=nn(j[code+"_CL_VOLUMEALL"]),pumps=[],dose=null;
+  if(vol==null){var sum=0,f=0;Object.keys(j).forEach(function(k){var m=k.match(new RegExp("^"+code+"_CL_VOLUME(\\d+)$"));if(m){var v=nn(j[k]);if(v!=null){sum+=v;f++;}}});if(f)vol=sum;}
+  var fr=nn(j[code+"_CL_FLOWRATE"]);
+  if(fr!=null)dose=fr;
+  else{var s=0,f2=0;Object.keys(j).forEach(function(k){if(/_CL_P\dAB_FLOWRATE$/.test(k)){var v=nn(j[k]);if(v!=null){s+=Math.max(0,v);f2++;}}});if(f2)dose=s;}
+  Object.keys(j).forEach(function(k){var m=k.match(new RegExp("^"+code+"_CL_(P[0-9A-Z]+)_STATUS$"));if(m&&(j[k]===true||j[k]===1))pumps.push(m[1]);});
+  if(vol==null&&dose==null)return null;
+  return {vol:vol,dose:dose,pumps:pumps,dt:j.timestamp||null};
+}
 function loadChlorineInfo(id){
   var tryF=function(paths){
     return fT(API+paths,8000).then(function(r){if(!r.ok)throw 0;return r.json();})
@@ -813,7 +827,11 @@ function loadChlorineInfo(id){
   fT(CHL_HOST+"/api/chlorine-tank/"+id,17000).then(function(r){
     if(!r.ok){
       var se=S.stations[id];
-      if(se&&!se.tank){se.tankErr="server ตอบ HTTP "+r.status+(r.status===500?" (สถานีนี้อาจยังไม่เชื่อมระบบถังคลอรีนเข้า backend)":"");if(S.detailOpen===id)renderDetail(id);}
+      if(se&&!se.tank){
+        se.tankErr="server ตอบ HTTP "+r.status;
+        tank113(id); // ลองแหล่ง SCADA สำรอง
+        if(S.detailOpen===id)renderDetail(id);
+      }
       return null;
     }
     return r.json();
@@ -828,8 +846,22 @@ function loadChlorineInfo(id){
     st.tank={level:nn(d.LEVEL),volume:nn(d.VOLUMP),dose:nn(d.FLOWRATE),cab:null,dosing:nn(d.DOSING),inlet:nn(d.INLETFLOW),dt:d.timeDate||null};
     if(S.detailOpen===id)renderDetail(id);
   }).catch(function(){
-    var st=S.stations[id];if(st&&!st.tank){st.tankErr="เชื่อมไม่ได้ (CORS/เครือข่าย)";if(S.detailOpen===id)renderDetail(id);}
+    var st=S.stations[id];if(st&&!st.tank){st.tankErr="เชื่อมไม่ได้ (CORS/เครือข่าย)";tank113(id);if(S.detailOpen===id)renderDetail(id);}
   });
+}
+function tank113(id){
+  var st=S.stations[id];if(!st||st.tank)return;
+  var code=META[id]&&META[id].code;
+  if(!code||!HAS113[code])return;
+  fT(REST113+"/"+code+"/Cl",8000)
+    .then(function(r){if(!r.ok)throw 0;return r.json();})
+    .then(function(j){
+      var p=parse113(code,j);if(!p)return;
+      var st2=S.stations[id];if(!st2||st2.tank)return;
+      st2.tank={level:null,volume:p.vol,dose:p.dose,cab:null,dosing:null,inlet:null,dt:p.dt,pumps:p.pumps,src:"scada"};
+      st2.tankErr=false;
+      if(S.detailOpen===id)renderDetail(id);
+    }).catch(function(){});
 }
 
 window.dpCalc=function(){
@@ -1051,6 +1083,7 @@ function renderDetail(id){
   w.push('<text x="140" y="165" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fbbf24">ถังเก็บคลอรีนน้ำ</text>');
   var tk=s.tank||{};
   var rows=[["Level",(tk.level!=null?(+tk.level).toFixed(2):"—"),"m"],["Volume",(tk.volume!=null?Math.round(tk.volume).toLocaleString():"—"),"L"],["Dose rate",(tk.dose!=null?(+tk.dose).toFixed(1):"—"),"L/hr"]];
+  if(tk.pumps)rows.push(["ปั๊มจ่าย",(tk.pumps.length?tk.pumps.join(",")+" ▶":"หยุด"),""]);
   for(var q3=0;q3<3;q3++){var ry3=196+q3*31;
     w.push('<text x="46" y="'+(ry3+5)+'" font-size="12" fill="#c8b98a">'+rows[q3][0]+'</text>');
     w.push('<rect x="118" y="'+(ry3-13)+'" width="78" height="26" rx="7" fill="#0d1a2d" stroke="#3b4f68"/>');
