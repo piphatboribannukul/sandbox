@@ -113,17 +113,17 @@ var S={tanks:{},reco:{},live:{}};
 var WQC3="http://172.16.196.100:3000";
 var REST113="http://172.16.183.113/restData"; // SCADA จ่ายคลอรีน: SR KT PK TP RB
 var HAS113={SR:1,KT:1,PK:1,TP:1,RB:1};
-function parse113(code,j){
+function parse113(code,j,nT){
   if(!j)return null;
   var volAll=nf(j[code+"_CL_VOLUMEALL"]);
   var vol=volAll,pumps=[],dose=null,n=0;
-  if(vol==null){ // รวมรายถัง VOLUME01..09
+  if(vol==null){ // เซ็นเซอร์วัดตัวแทนคู่ถังแฝด -> scale ตามจำนวนถังจริง (ยืนยันจาก KT: VOLUMEALL = ผลรวม x2)
     var sum=0,found=0;
     Object.keys(j).forEach(function(k){
       var m=k.match(new RegExp("^"+code+"_CL_VOLUME(\\d+)$"));
       if(m){var v=nf(j[k]);if(v!=null){sum+=v;found++;}}
     });
-    if(found)vol=sum;
+    if(found)vol=sum*(nT&&found<nT?nT/found:1);
   }
   var fr=nf(j[code+"_CL_FLOWRATE"]);
   if(fr!=null)dose=fr;
@@ -154,12 +154,20 @@ function loadAll(){
   function worker(){
     if(qi>=IDS.length)return;
     var id=IDS[qi++];
-    fT(CHL_HOST+"/api/chlorine-tank/"+id,6000)
-      .then(function(r){if(!r.ok)throw 0;return r.json();})
-      .then(function(j){
-        var d=(j&&j.data)||{};
-        S.tanks[id]={vol:nf(d.VOLUMP),level:nf(d.LEVEL),dose:nf(d.FLOWRATE),dt:d.timeDate||null};
-        okc++;render();
+    var hitTank=function(ms){
+      return fT(CHL_HOST+"/api/chlorine-tank/"+id,ms)
+        .then(function(r){if(!r.ok)throw 0;return r.json();})
+        .then(function(j){
+          var d=(j&&j.data)||{};
+          S.tanks[id]={vol:nf(d.VOLUMP),level:nf(d.LEVEL),dose:nf(d.FLOWRATE),dt:d.timeDate||null};
+          okc++;render();
+        });
+    };
+    hitTank(6000)
+      .catch(function(){
+        // สถานีที่ไม่มี SCADA สำรอง (MB/LA/LK/BP): ให้โอกาสสอง timeout ยาว ก่อนยอมแพ้
+        if(!HAS113[CFG[id].code])return hitTank(16000);
+        throw 0;
       })
       .catch(function(){
         var code=CFG[id].code;
@@ -167,7 +175,7 @@ function loadAll(){
           return fT(REST113+"/"+code+"/Cl",8000)
             .then(function(r){if(!r.ok)throw 0;return r.json();})
             .then(function(j){
-              var p=parse113(code,j);
+              var p=parse113(code,j,CFG[id].n);
               if(p){S.tanks[id]={vol:p.vol,level:null,dose:p.dose,dt:p.dt,pumps:p.pumps,src:"scada"};okc++;render();}
               else{S.tanks[id]=S.tanks[id]&&S.tanks[id].vol!=null?S.tanks[id]:{vol:null};}
             })
@@ -255,7 +263,7 @@ function render(){
         +'<div class="big" style="color:'+col+'">'+(has?Math.round(vol).toLocaleString():"—")+'<span class="u"> ลิตร</span></div>'
         +'<div class="pct">'+(has?(fillPct.toFixed(0)+"% ของความจุ · เกณฑ์เติม "+c.th.toLocaleString()+" ล."):"เกณฑ์เติม "+c.th.toLocaleString()+" ล.")+'</div>'
         +'<div class="meta">'+(has
-            ?((t.level!=null?'ระดับ <b>'+t.level.toFixed(2)+' ม.</b> · ':'')+'จ่ายจริง <b>'+(t.dose!=null?t.dose.toFixed(1)+" ล./ชม.":"—")+'</b>'
+            ?((t.level!=null?'ระดับ <b>'+t.level.toFixed(2)+' ม.</b> · ':'')+'จ่ายจริง <b>'+(t.dose!=null?Math.max(0,t.dose).toFixed(1)+" ล./ชม.":"—")+'</b>'
               +(t.pumps&&t.pumps.length?'<br>ปั๊มจ่ายทำงาน: <b style="color:#4ade80">'+t.pumps.join(", ")+' ▶</b>':(t.pumps?'<br>ปั๊มจ่าย: <span style="color:#7d93ab">หยุดทุกตัว</span>':''))
               +(t.dt?'<br>ข้อมูล '+t.dt:'')+(t.src==="scada"?' <span style="font-size:9px;color:#a78bfa;border:1px solid rgba(167,139,250,0.4);border-radius:6px;padding:0 5px">SCADA</span>':''))
             :'รอเชื่อมข้อมูล — backend ยังไม่ต่อระบบถังสถานีนี้')+'</div>'

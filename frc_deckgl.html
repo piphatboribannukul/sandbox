@@ -803,7 +803,7 @@ function parse113(code,j){
   if(!j)return null;
   var nn=function(v){v=parseFloat(v);return isFinite(v)?v:null;};
   var vol=nn(j[code+"_CL_VOLUMEALL"]),pumps=[],dose=null;
-  if(vol==null){var sum=0,f=0;Object.keys(j).forEach(function(k){var m=k.match(new RegExp("^"+code+"_CL_VOLUME(\\d+)$"));if(m){var v=nn(j[k]);if(v!=null){sum+=v;f++;}}});if(f)vol=sum;}
+  if(vol==null){var sum=0,f=0;Object.keys(j).forEach(function(k){var m=k.match(new RegExp("^"+code+"_CL_VOLUME(\\d+)$"));if(m){var v=nn(j[k]);if(v!=null){sum+=v;f++;}}});if(f)vol=sum*(f<4?4/f:1);} // ถังแฝด: เซ็นเซอร์คู่ละตัว (ทุกสถานี SCADA = 4 ถัง)
   var fr=nn(j[code+"_CL_FLOWRATE"]);
   if(fr!=null)dose=fr;
   else{var s=0,f2=0;Object.keys(j).forEach(function(k){if(/_CL_P\dAB_FLOWRATE$/.test(k)){var v=nn(j[k]);if(v!=null){s+=Math.max(0,v);f2++;}}});if(f2)dose=s;}
