@@ -1037,7 +1037,9 @@ function renderDetail(id){
 
   // ---------- ถังคลอรีน + ท่อ ----------
   var cc=110,crx=88,cry=22,ct=412,cb=558;
-  var _tkl=(s.tank&&s.tank.level!=null)?Math.max(0.06,Math.min(s.tank.level/3,1)):0.45;
+  var _cap=(id==="20")?45000:24000; // ความจุถังคลอรีนรวม (MB 3x15000, อื่น 4x6000)
+  var _tkl=(s.tank&&s.tank.level!=null)?Math.max(0.06,Math.min(s.tank.level/3,1))
+          :((s.tank&&s.tank.volume!=null)?Math.max(0.06,Math.min(s.tank.volume/_cap,1)):0.45);
   var cly=cb-_tkl*(cb-ct-14);
   w.push('<path d="M'+(cc-crx)+' '+ct+' L'+(cc-crx)+' '+cb+' A'+crx+' '+cry+' 0 0 0 '+(cc+crx)+' '+cb+' L'+(cc+crx)+' '+ct+'" fill="url(#dpclg)" stroke="#d9b23a" stroke-width="1.6"/>');
   w.push('<path d="M'+(cc-crx)+' '+cly+' L'+(cc-crx)+' '+cb+' A'+crx+' '+cry+' 0 0 0 '+(cc+crx)+' '+cb+' L'+(cc+crx)+' '+cly+' A'+crx+' '+cry+' 0 0 1 '+(cc-crx)+' '+cly+'" fill="url(#dpclq)"/>');
