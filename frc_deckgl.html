@@ -106,6 +106,8 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
     <div style="display:flex;gap:4px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:3px">
       <button id="btn-dark" class="theme-btn active" onclick="setTheme('dark')">🌑 มืด</button>
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
+        <button class="theme-btn" onclick="uiZoom(-0.15)" title="ย่อป้ายสถานี">ก−</button>
+        <button class="theme-btn" onclick="uiZoom(0.15)" title="ขยายป้ายสถานี">ก+</button>
     </div>
     <a href="frc_chlorine.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(251,191,36,0.25);border-radius:20px;padding:6px 14px;font-size:11px;color:#fbbf24;text-decoration:none;font-weight:600">🧪 คลอรีนคงเหลือ</a>
 <a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
@@ -259,6 +261,7 @@ let animTime=0;
 
 window.__S={stations:{},hist:{},detailOpen:null,selectedId:null,simLevel:4.0,simFlow:16000,threshold:0.8,layersOn:{pipe:true,area:true},theme:"dark",dose:{target:1.00,factor:0.89,sg:1.20,frcin:null,k:null,t:null,q:null}};
 const S=window.__S;
+try{S.uiScale=parseFloat(localStorage.getItem("frcUiScale"))||1;}catch(e){S.uiScale=1;}
 
 function frcColor(fo,booster){
   var dark=S.theme==="dark";
@@ -480,22 +483,27 @@ function buildLayers(){
   L.push(new deck.IconLayer({id:"tank-icons",data:arr,pickable:true,billboard:true,
     getPosition:d=>d.coord,
     getIcon:function(d){var m=icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
-    getSize:102,sizeUnits:"pixels",
+    getSize:Math.round(102*(S.uiScale||1)),sizeUnits:"pixels",
     updateTriggers:{getIcon:[iconSig]}}));
   // Hub สูบส่ง — ถังตกตะกอน (แบบ C)
   L.push(new deck.IconLayer({id:"hubs",data:HUBS,pickable:true,billboard:true,
     getPosition:d=>d.coord,getPixelOffset:d=>d.off||[0,0],
     getIcon:function(d){var m=icDim(120,106,84,78);return {url:hubIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
-    getSize:78,sizeUnits:"pixels",
+    getSize:Math.round(78*(S.uiScale||1)),sizeUnits:"pixels",
     updateTriggers:{getIcon:[S.theme,DPR,HUBS.map(function(h){return h.frc;}).join()]}}));
   // ป้าย tag โรงงานผลิตน้ำ (การ์ดสไตล์เดียวกับสถานี)
   L.push(new deck.IconLayer({id:"plant-tags",data:SOURCES,pickable:true,billboard:true,
     getPosition:d=>d.coord,getPixelOffset:function(){return [0,-6];},
     getIcon:function(d){var m=icDim(190,150,142,140);return {url:plantIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
-    getSize:140,sizeUnits:"pixels",
+    getSize:Math.round(140*(S.uiScale||1)),sizeUnits:"pixels",
     updateTriggers:{getIcon:[S.theme,DPR]}}));
   overlay.setProps({layers:L});
 }
+window.uiZoom=function(dd){
+  S.uiScale=Math.min(1.6,Math.max(0.85,Math.round(((S.uiScale||1)+dd)*100)/100));
+  try{localStorage.setItem("frcUiScale",S.uiScale);}catch(e){}
+  buildLayers();
+};
 
 let lastFrame=0,animErrShown=false;
 function animate(ts){
@@ -798,7 +806,7 @@ function fbLoadDose(id){
 }
 
 var REST113="http://172.16.183.113/restData";
-var HAS113={SR:1,KT:1,PK:1,TP:1,RB:1};
+var HAS113={SR:1,KT:1,PK:1,TP:1,RB:1,LA:1};
 function parse113(code,j){
   if(!j)return null;
   var nn=function(v){v=parseFloat(v);return isFinite(v)?v:null;};
