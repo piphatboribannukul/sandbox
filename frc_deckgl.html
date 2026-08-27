@@ -276,7 +276,19 @@ function mkMapStyle(theme){
   // OpenFreeMap vector styles — ฟรีถาวร ไม่มี key (dark = สายเดียวกับ dark-matter เดิม)
   return theme==="dark"?"https://tiles.openfreemap.org/styles/dark":"https://tiles.openfreemap.org/styles/positron";
 }
+function addOutsideMask(){
+  try{
+    if(map.getLayer("mwa-mask"))return;
+    var dark=S.theme==="dark";
+    var world=[[100.0,13.2],[101.3,13.2],[101.3,14.3],[100.0,14.3],[100.0,13.2]];
+    var hole=MWA_BOUNDARY.features[0].geometry.coordinates[0];
+    if(!map.getSource("mwa-mask-src"))map.addSource("mwa-mask-src",{type:"geojson",data:{type:"Feature",geometry:{type:"Polygon",coordinates:[world,hole]}}});
+    map.addLayer({id:"mwa-mask",type:"fill",source:"mwa-mask-src",
+      paint:{"fill-color":dark?"#0a1220":"#f4f6f9","fill-opacity":dark?0.62:0.66}});
+  }catch(e){}
+}
 function addBuildings3D(){
+  addOutsideMask();
   try{
     if(map.getLayer("3d-b"))return;
     var dark=S.theme==="dark";
@@ -299,6 +311,7 @@ const map=new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"bottom-right");
 map.on("style.load",function(){addBuildings3D();});
+map.on("idle",function(){addBuildings3D();}); // กันจังหวะ: มี guard ภายใน ไม่เพิ่มซ้ำ
 
 window.setTheme=function(t){
   S.theme=t;
@@ -337,10 +350,10 @@ function tankIconURL(d){
   var byp=!!d.bypass;
   var bypC=dark?"#fbbf24":"#b45309";
   var cardBg=dark?"#0a1526":"#ffffff";
-  var nameC=dark?"#e2eefc":"#0f2740";
-  var dimC=dark?"#8aa3bd":"#5b7089";
-  var inC=dark?"#67e8f9":"#0369a1";
-  var outC=dark?"#4ade80":"#15803d";
+  var nameC=dark?"#e2eefc":"#0b1f33";
+  var dimC=dark?"#8aa3bd":"#3f5468";
+  var inC=dark?"#67e8f9":"#025a8c";
+  var outC=dark?"#4ade80":"#0f6d33";
   var halo=dark?"#04070f":"#ffffff";
   var inTxt=(d.frcIn!=null&&d.frcIn>0)?d.frcIn.toFixed(2):"-",outTxt=d.frcOut!=null?d.frcOut.toFixed(2):"-";
   var lv=(d.level||0).toFixed(2);
@@ -352,7 +365,8 @@ function tankIconURL(d){
   var P=function(x,y){return x+","+y;};
   var _m=icDim(176,142,132,102);
   var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+_m.w+'" height="'+_m.h+'" viewBox="0 0 176 142">'
-    +'<rect x="4" y="4" width="168" height="58" rx="9" fill="'+cardBg+'" fill-opacity="0.94" stroke="'+(byp?bypC:(sel?lite:col))+'" stroke-width="'+(sel?"2.4":"1.2")+'"/>'
+    +(dark?'':'<rect x="6" y="7" width="168" height="58" rx="9" fill="#334155" fill-opacity="0.28"/>')
+    +'<rect x="4" y="4" width="168" height="58" rx="9" fill="'+cardBg+'" fill-opacity="'+(dark?"0.94":"0.99")+'" stroke="'+(byp?bypC:(sel?lite:col))+'" stroke-width="'+(sel?"2.4":(dark?"1.2":"1.6"))+'"/>' 
     +'<line x1="13" y1="4" x2="38" y2="4" stroke="'+lite+'" stroke-width="2.5"/>'
     +'<circle cx="16" cy="18" r="4" fill="'+col+'"/>'
     +'<text x="26" y="23" font-family="monospace" font-size="14" font-weight="700" fill="'+nameC+'">'+d.code+'</text>'
