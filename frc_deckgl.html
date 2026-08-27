@@ -273,28 +273,23 @@ function frcColor(fo,booster){
 }
 
 function mkMapStyle(theme){
-  var dark=theme==="dark";
-  // CARTO เริ่มบังคับ API key (ส.ค. 69) -> ย้ายเป็น Esri Gray Canvas (ฟรี ไม่ใช้ key)
-  var tiles=dark?
-    ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"]:
-    ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"];
-  var bld=dark?
-    ["interpolate",["linear"],["coalesce",["get","render_height"],10],0,"#1a2942",50,"#2a4560",120,"#356080"]:
-    ["interpolate",["linear"],["coalesce",["get","render_height"],10],0,"#ffffff",50,"#e8ebef",120,"#d8dde3"];
-  return{version:8,
-    sources:{
-      "base":{type:"raster",tiles:tiles,tileSize:256,maxzoom:16,attribution:"© Esri © OpenStreetMap"},
-      "omt":{type:"vector",url:"https://tiles.openfreemap.org/planet"}
-    },
-    layers:[
-      {id:"bg",type:"background",paint:{"background-color":dark?"#0a1220":"#eef1f5"}},
-      {id:"base-r",type:"raster",source:"base",paint:{"raster-opacity":dark?0.85:0.5}},
-      {id:"3d-b",source:"omt","source-layer":"building",type:"fill-extrusion",minzoom:13,
-        paint:{"fill-extrusion-color":bld,
-          "fill-extrusion-height":["coalesce",["get","render_height"],10],
-          "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
-          "fill-extrusion-opacity":dark?0.8:0.92}}
-    ]};
+  // OpenFreeMap vector styles — ฟรีถาวร ไม่มี key (dark = สายเดียวกับ dark-matter เดิม)
+  return theme==="dark"?"https://tiles.openfreemap.org/styles/dark":"https://tiles.openfreemap.org/styles/positron";
+}
+function addBuildings3D(){
+  try{
+    if(map.getLayer("3d-b"))return;
+    var dark=S.theme==="dark";
+    if(!map.getSource("omt"))map.addSource("omt",{type:"vector",url:"https://tiles.openfreemap.org/planet"});
+    var bld=dark?
+      ["interpolate",["linear"],["coalesce",["get","render_height"],10],0,"#1a2942",50,"#2a4560",120,"#356080"]:
+      ["interpolate",["linear"],["coalesce",["get","render_height"],10],0,"#ffffff",50,"#e8ebef",120,"#d8dde3"];
+    map.addLayer({id:"3d-b",source:"omt","source-layer":"building",type:"fill-extrusion",minzoom:13,
+      paint:{"fill-extrusion-color":bld,
+        "fill-extrusion-height":["coalesce",["get","render_height"],10],
+        "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
+        "fill-extrusion-opacity":S.theme==="dark"?0.8:0.92}});
+  }catch(e){}
 }
 
 const map=new maplibregl.Map({
@@ -303,6 +298,7 @@ const map=new maplibregl.Map({
   maxBounds:[[100.20,13.40],[101.02,14.10]],maxTileCacheSize:200
 });
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"bottom-right");
+map.on("style.load",function(){addBuildings3D();});
 
 window.setTheme=function(t){
   S.theme=t;
