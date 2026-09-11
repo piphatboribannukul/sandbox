@@ -156,7 +156,7 @@ const MOCK={
   "5":{frcIn:1.42,frcOut:1.34,turb:0.35,temp:29.0,ph:7.1},"9":{frcIn:1.18,frcOut:1.22,turb:0.40,temp:29.5,ph:7.36,bypass:true},
   "18":{frcIn:null,frcOut:0.87,turb:0.40,temp:29.4,ph:7.2},"17":{frcIn:0.90,frcOut:0.93,turb:0.65,temp:29.8,ph:7.21,bypass:true},
   "14":{frcIn:0.13,frcOut:1.05,turb:0.35,temp:30.8,ph:7.18},"20":{frcIn:1.04,frcOut:1.39,turb:0.45,temp:29.6,ph:7.25},
-  "15":{frcIn:0.73,frcOut:1.20,turb:0.38,temp:29.9,ph:7.15},"19":{frcIn:0.38,frcOut:1.11,turb:0.52,temp:30.1,ph:7.19},
+  "15":{frcIn:0.73,frcOut:1.20,turb:0.38,temp:29.9,ph:7.15},"LK2":{frcIn:0.43,frcOut:0.70,turb:0.30,temp:29.5,ph:7.20},"19":{frcIn:0.38,frcOut:1.11,turb:0.52,temp:30.1,ph:7.19},
 };
 const API="http://172.16.196.100:3000/api",USE_MOCK=false,REFRESH=60;
 const HUB_API="https://twqonline.mwa.co.th/TWQMSServicepublic/api/mwaonmobile/getStations";
@@ -174,6 +174,7 @@ const META={
   "14":{code:"SR",name:"สำโรง",area:14081,maxLv:5.63,flow:20000,k:2.652,coord:[100.59082,13.662468],src:"TR1"},
   "20":{code:"MB",name:"มีนบุรี",area:11961,maxLv:7.1,flow:16000,k:0.627,coord:[100.74055,13.826229],src:"TR3"},
   "15":{code:"LK",name:"ลาดกระบัง",area:9000,maxLv:5.63,flow:10000,k:0.047,coord:[100.741005,13.724753],src:"TR3"},
+  "LK2":{code:"LK2",name:"ลาดกระบัง 2",area:11410,maxLv:5.36,flow:8000,k:4.0,sim:true,coord:[100.7423,13.7253],src:"TR3"}, // ถังใหม่ k สูงช่วง passivate — คำนวณจากสนาม 11/9/69 (in 0.43 out 0.70 dose 100 ล./ชม. Q 8,000)
   "19":{code:"BP",name:"บางพลี",area:11000,maxLv:5.9,flow:22000,k:null,coord:[100.713974,13.598997],src:"TR3"},
 };
 const IDS=Object.keys(META);
@@ -262,6 +263,17 @@ let animTime=0;
 window.__S={stations:{},hist:{},detailOpen:null,selectedId:null,simLevel:4.0,simFlow:16000,threshold:0.8,layersOn:{pipe:true,area:true},theme:"dark",dose:{target:1.00,factor:0.89,sg:1.20,frcin:null,k:null,t:null,q:null}};
 const S=window.__S;
 try{S.uiScale=parseFloat(localStorage.getItem("frcUiScale"))||1;}catch(e){S.uiScale=1;}
+// LK2: ยังไม่มี API — ค่าสนามชั่วคราว 11/09/69 (ลบทิ้งเมื่อ API มา)
+function seedLK2(){
+  if(S.stations["LK2"])return;
+  var m=META["LK2"];
+  S.stations["LK2"]=Object.assign({},m,{stationId:"LK2",frcIn:0.43,frcOut:0.70,level:5.13,
+    turb:null,tempOut:null,ph:null,conduct:null,fis:8000,qin:8000,flowLive:8000,
+    kt:null,t:(5.13*m.area)/m.flow,kHist:m.k,bypass:false,dosing:true,hasBooster:true,
+    p1:null,p2:null,dt:"ค่าสนาม 11/09/69 (รอ API)"});
+}
+seedLK2();
+setInterval(seedLK2,15000); // กันโดนรอบโหลดล้าง/ข้าม
 
 function frcColor(fo,booster){
   var dark=S.theme==="dark";
@@ -311,7 +323,9 @@ const map=new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"bottom-right");
 map.on("style.load",function(){addBuildings3D();});
-map.on("idle",function(){addBuildings3D();}); // กันจังหวะ: มี guard ภายใน ไม่เพิ่มซ้ำ
+map.on("idle",function(){addBuildings3D();});
+var _zt=null;
+map.on("zoom",function(){if(_zt)return;_zt=setTimeout(function(){_zt=null;try{buildLayers();}catch(e){}},160);}); // กันจังหวะ: มี guard ภายใน ไม่เพิ่มซ้ำ
 
 window.setTheme=function(t){
   S.theme=t;
@@ -363,6 +377,8 @@ function tankIconURL(d){
   var f=Math.max(0.08,Math.min((d.level||0)/(d.maxLv||6),1));
   var wf=botF-f*hgt;
   var P=function(x,y){return x+","+y;};
+  var simBand=d.sim?('<rect x="4" y="63" width="168" height="17" rx="6" fill="#b45309" fill-opacity="0.96"/>'
+    +'<text x="88" y="75.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#fff7ed">⚠ ค่าจำลอง — ยังไม่เชื่อมระบบ</text>'):"";
   var _m=icDim(176,142,132,102);
   var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+_m.w+'" height="'+_m.h+'" viewBox="0 0 176 142">'
     +(dark?'':'<rect x="6" y="7" width="168" height="58" rx="9" fill="#334155" fill-opacity="0.28"/>')
@@ -390,7 +406,7 @@ function tankIconURL(d){
     +(byp?'<line x1="'+(cx-hw-11)+'" y1="'+(topY+dy+hgt/2)+'" x2="'+(cx+hw+11)+'" y2="'+(topY+dy+hgt/2)+'" stroke="'+bypC+'" stroke-width="3" stroke-linecap="round" opacity="0.95"/><path d="M'+(cx+hw+4)+' '+(topY+dy+hgt/2-4)+' L'+(cx+hw+12)+' '+(topY+dy+hgt/2)+' L'+(cx+hw+4)+' '+(topY+dy+hgt/2+4)+'" fill="none" stroke="'+bypC+'" stroke-width="1.6"/>':'')
     +'<line x1="'+(cx+hw)+'" y1="'+(wf-dy)+'" x2="'+(cx+hw+6)+'" y2="'+(wf-dy)+'" stroke="'+lite+'" stroke-width="1.4"/>'
     +'<text x="'+(cx+hw+9)+'" y="'+(wf-dy+4)+'" font-family="monospace" font-size="12.5" font-weight="700" fill="'+lite+'" stroke="'+halo+'" stroke-width="3" paint-order="stroke">'+lv+' m</text>'
-    +'</svg>';
+    +simBand+'</svg>';
   return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
 
@@ -447,6 +463,16 @@ function plantIconURL(d){
 function buildLayers(){
   var arr=Object.values(S.stations);
   if(!arr.length)return;
+  // LK2 อยู่ติด LK จริง -> ซูมออกแล้วป้าย/ถังทับกัน: ถ่างตำแหน่งแสดงผลตาม zoom (z>=14 ตำแหน่งจริง, z<=12 ถ่างเต็ม)
+  try{
+    var _z=map.getZoom();
+    var _t=Math.max(0,Math.min(1,(14-_z)/2));
+    arr=arr.map(function(d){
+      if(d.stationId!=="LK2"||!_t)return d;
+      var c=[d.coord[0]+0.0105*_t,d.coord[1]+0.0052*_t];
+      return Object.assign({},d,{coord:c});
+    });
+  }catch(e){}
   var pulse=(Date.now()/1400)%1;
   var dark=S.theme==="dark";
   var L=[];
@@ -484,10 +510,14 @@ function buildLayers(){
       getWidth:60,widthMinPixels:1.8,
       trailLength:130,currentTime:animTime,capRounded:true,fadeTrail:true,opacity:0.98}));
   }
+  var phz=function(d){ // เฟสเฉพาะสถานี (กระจายจังหวะ ไม่เต้นพร้อมกัน)
+    var h=0,s=String(d.stationId||"");for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%97;
+    return (pulse+h/97)%1;
+  };
   L.push(new deck.ScatterplotLayer({id:"pulse",data:arr,getPosition:d=>d.coord,
-    getRadius:d=>560+pulse*950*(d.stationId===S.selectedId?1.4:1),
-    getFillColor:d=>frcColor(d.frcOut,d.hasBooster).concat([Math.round(70*(1-pulse))]),
-    getLineColor:d=>frcColor(d.frcOut,d.hasBooster).concat([Math.round(160*(1-pulse))]),
+    getRadius:d=>{var p=phz(d);return 560+p*950*(d.stationId===S.selectedId?1.4:1);},
+    getFillColor:d=>{var p=phz(d);return frcColor(d.frcOut,d.hasBooster).concat([Math.round(70*(1-p))]);},
+    getLineColor:d=>{var p=phz(d);return frcColor(d.frcOut,d.hasBooster).concat([Math.round(160*(1-p))]);},
     stroked:true,lineWidthMinPixels:1.5,filled:true,
     updateTriggers:{getRadius:[pulse,S.selectedId],getFillColor:[pulse],getLineColor:[pulse]}}));
   var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId+"|"+DPR;
@@ -657,7 +687,7 @@ function renderInfo(){
   var panel=document.getElementById("infoPanel");panel.classList.add("show");
   var kd=s.kHist,canCalc=kd&&kd>0;
   var srcName={MTR:"สูบส่งมหาสวัสดิ์ (MTR)",TR1:"สูบส่งบางเขน 1 (TR1)",TR2:"สูบส่งบางเขน 2 (TR2)",TR3:"สูบส่งบางเขน 3 (TR3)"}[s.src]||s.src||"—";
-  var html='<div class="close" onclick="closeInfo()">✕</div><div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span class="open-st-btn" style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
+  var html='<div class="close" onclick="closeInfo()">✕</div>'+(s.sim?'<div style="background:rgba(180,83,9,0.25);border:1px solid rgba(251,146,60,0.6);color:#fdba74;border-radius:10px;padding:7px 10px;margin-bottom:8px;font-size:12.5px;font-weight:800;text-align:center">⚠ ค่าจำลอง — ยังไม่มีการเชื่อมต่อระบบกับ LK2</div>':'')+'<div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span class="open-st-btn" style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
     '<div class="stat-row"><span class="stat-label">เติมคลอรีนเสริม (จาก FRC)</span><span class="stat-value mono" style="color:'+(s.dosing?"#a78bfa":"#7d93ab")+'">'+(s.dosing?"มี (Booster)":"ไม่มี")+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">ปั๊มดึงน้ำเข้าเครื่องวัด</span><span class="stat-value mono">P1 '+(s.p1===1?"✓":(s.p1===0?"✗":"—"))+' · P2 '+(s.p2===1?"✓":(s.p2===0?"✗":"—"))+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">สถานะการจ่าย</span><span class="stat-value mono" style="color:'+(s.bypass?"#fbbf24":"#34d399")+'">'+(s.bypass?"\u21c4 BYPASS ไม่ผ่านถัง":"ปกติ ผ่านถังน้ำใส")+'</span></div>'+
@@ -1161,7 +1191,7 @@ function renderDetail(id){
     '<div class="dp-head">'
     +'<button class="dp-back" onclick="closeDetail()">← กลับแผนที่</button>'
     +'<span class="dp-code">'+s.code+'</span>'
-    +'<span class="dp-title">สถานีสูบจ่ายน้ำ'+s.name+'<small>Water Quality Monitoring &amp; Re-Chlorination · รับน้ำจากอุโมงค์ '+(s.src||"—")+'</small></span>'
+    +(s.sim?'<span style="background:#b45309;color:#fff7ed;border-radius:9px;padding:4px 12px;font-size:13px;font-weight:800;margin-right:10px">⚠ ค่าจำลอง</span>':'')+'<span class="dp-title">สถานีสูบจ่ายน้ำ'+s.name+'<small>Water Quality Monitoring &amp; Re-Chlorination · รับน้ำจากอุโมงค์ '+(s.src||"—")+'</small></span>'
     +(byp?'<span class="dp-chip" style="background:#3a2d10;color:#fbbf24;border-color:#7a5c14">⇄ BYPASS</span>':'')
     +'<span style="font-size:10px;color:#7d93ab;margin-left:2px">ปั๊มดึงน้ำเข้าเครื่องวัดขาเข้า:</span>'+chipP("P1",s.p1)+chipP("P2",s.p2)
     +'<span style="margin-left:auto;text-align:right;line-height:1.5"><span style="color:#4ade80;font-size:12px;font-weight:700">● '+(s.lvLive?"LIVE":"ONLINE")+'</span><br><span style="color:#8fb3cc;font-size:12px;font-family:JetBrains Mono,monospace">'+(s.dt||"")+'</span></span>'
