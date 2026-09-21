@@ -161,10 +161,11 @@ var META={
   "14":{code:"SR",name:"สำโรง",area:14081,flow:20000,k:2.652},
   "20":{code:"MB",name:"มีนบุรี",area:11961,flow:16000,k:0.627},
   "15":{code:"LK",name:"ลาดกระบัง",area:9000,flow:10000,k:0.047},
-  "19":{code:"BP",name:"บางพลี",area:11000,flow:22000,k:null}
+  "19":{code:"BP",name:"บางพลี",area:11000,flow:22000,k:null},
+  "LK2":{code:"LK2",name:"ลาดกระบัง 2",area:11410,flow:15000,k:0.3,sampling:true}
 };
 var MOCK={"4":[1.44,1.36],"16":[1.30,1.18],"5":[1.42,1.34],"9":[1.18,1.22],"18":[null,0.87],"17":[0.90,0.93],"14":[0.13,1.05],"20":[1.04,1.39],"15":[0.73,1.20],"19":[0.38,1.11]};
-var IDS=Object.keys(META);
+var IDS=Object.keys(META).filter(function(id){return id!=="LK2";}); // LK2 ยังไม่มี API — ใช้เฉพาะกราฟ k
 var S={st:{},hubs:{},hist:{},sortK:"frcOut",sortAsc:true,mode:""};
 
 function fT(u,ms){return Promise.race([fetch(u,{cache:"no-store"}),new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"));},ms||8000);})]);}
@@ -300,6 +301,7 @@ function renderBars(arr){
   document.getElementById("barchart").innerHTML=s;
 }
 function renderK(arr){
+  if(META["LK2"]&&!arr.some(function(s){return s&&s.code==="LK2";}))arr=arr.concat([META["LK2"]]);
   var a=arr.filter(function(s){return s.k!=null;}).sort(function(x,y){return y.k-x.k;});
   var W=460,rowH=26,H=a.length*rowH+10,mx=2.8;
   var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;font-family:JetBrains Mono,monospace">';
@@ -310,9 +312,9 @@ function renderK(arr){
     s+='<text x="6" y="'+(y+13)+'" font-size="12" font-weight="700" fill="#67e8f9">'+st.code+'</text>';
     s+='<rect x="52" y="'+y+'" width="'+(W-150)+'" height="17" rx="8" fill="#141f33"/>';
     s+='<rect x="52" y="'+y+'" width="'+Math.max(2,w)+'" height="17" rx="8" fill="'+c+'" fill-opacity="0.8"/>';
-    s+='<text x="'+(W-90)+'" y="'+(y+13)+'" font-size="11.5" font-weight="700" fill="'+c+'">'+st.k.toFixed(3)+(st.code==="SR"?" *":"")+'</text>';
+    s+='<text x="'+(W-90)+'" y="'+(y+13)+'" font-size="11.5" font-weight="700" fill="'+c+'">'+st.k.toFixed(3)+(st.code==="SR"?" *":(st.sampling?" \u2021":""))+'</text>';
   });
-  s+='</svg><div style="font-size:9.5px;color:#48596e;margin-top:5px">* SR ข้อมูลน้อย · LP/BP ไม่มีค่า k ที่เชื่อถือได้</div>';
+  s+='</svg><div style="font-size:9.5px;color:#48596e;margin-top:5px">* SR ข้อมูลน้อย · \u2021 LK2 ค่า sampling ก.ย. 69 (ถังใหม่ k ลดต่อเนื่อง) · LP/BP ไม่มีค่า k ที่เชื่อถือได้</div>';
   document.getElementById("kchart").innerHTML=s;
 }
 function spark(id){
