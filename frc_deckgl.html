@@ -174,7 +174,7 @@ const META={
   "14":{code:"SR",name:"สำโรง",area:14081,maxLv:5.63,flow:20000,k:2.652,coord:[100.59082,13.662468],src:"TR1"},
   "20":{code:"MB",name:"มีนบุรี",area:11961,maxLv:7.1,flow:16000,k:0.627,coord:[100.74055,13.826229],src:"TR3"},
   "15":{code:"LK",name:"ลาดกระบัง",area:9000,maxLv:5.63,flow:10000,k:0.047,coord:[100.741005,13.724753],src:"TR3"},
-  "LK2":{code:"LK2",name:"ลาดกระบัง 2",area:11410,maxLv:5.36,flow:15000,k:1.3,sim:true,coord:[100.7423,13.7253],src:"TR3"}, // k=1.3 จากอัตราจ่ายจริงเฉลี่ย 62 ล./ชม. (3-18 ก.ย.) — ทนต่อการเดา Q · ทบทวนด้วยคู่กลางคืน out 21:00/05:00
+  "LK2":{code:"LK2",name:"ลาดกระบัง 2",area:11410,maxLv:5.36,flow:15000,k:0.3,sim:true,coord:[100.7423,13.7253],src:"TR3"}, // k=0.3: วัด 18 ก.ย. (Q 13,000 in 0.78 dose 80 out 1.56) ได้ k~0 -> ถัง passivate แล้ว ตั้ง 0.3 เผื่อความปลอดภัย
   "19":{code:"BP",name:"บางพลี",area:11000,maxLv:5.9,flow:22000,k:null,coord:[100.713974,13.598997],src:"TR3"},
 };
 const IDS=Object.keys(META);
@@ -267,18 +267,15 @@ try{S.uiScale=parseFloat(localStorage.getItem("frcUiScale"))||1;}catch(e){S.uiSc
 function seedLK2(){
   var m=META["LK2"];
   if(!S.stations["LK2"]){
-    S.stations["LK2"]=Object.assign({},m,{stationId:"LK2",frcIn:0.43,frcOut:0.70,level:5.13,
+    S.stations["LK2"]=Object.assign({},m,{stationId:"LK2",frcIn:0.43,frcOut:1.56,level:5.13,
       turb:null,tempOut:null,ph:null,conduct:null,fis:15000,qin:15000,flowLive:15000,
       kt:null,t:(5.13*m.area)/m.flow,kHist:m.k,bypass:false,dosing:true,hasBooster:true,
-      p1:null,p2:null,dt:"ขาเข้า/น้ำเข้า: อิงเซ็นเซอร์ LK1 · รอ API LK2"});
+      p1:null,p2:null,dt:"ขาเข้า: เซ็นเซอร์ LK1 สด · ขาออก 1.56 (18/09) · น้ำเข้าเฉลี่ย 15,000 · รอ API LK2"});
   }
   // LK2 รับน้ำ TR3 ก้อนเดียวกับ LK1 -> ใช้ค่าจริงจากเซ็นเซอร์ LK1 (id 15) จนกว่าจะมี API เอง
   var lk=S.stations["15"],me=S.stations["LK2"];
-  if(lk&&me){
-    if(lk.frcIn!=null)me.frcIn=lk.frcIn;
-    var q=(lk.fis!=null?lk.fis:(lk.qin!=null?lk.qin:lk.flowLive));
-    if(q!=null&&q>0){me.fis=q;me.qin=q;me.flowLive=q;}
-  }
+  if(lk&&me&&lk.frcIn!=null)me.frcIn=lk.frcIn;
+  // flow ไม่ mirror จาก LK1 (LK1 หยุดสูบกลางวัน ค่าไม่แทน LK2) — ใช้เฉลี่ย 15,000 จนกว่ามี API
 }
 seedLK2();
 setInterval(seedLK2,15000); // กันโดนรอบโหลดล้าง/ข้าม
