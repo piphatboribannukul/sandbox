@@ -295,9 +295,13 @@ function mkMapStyle(theme){
 }
 function addOutsideMask(){
   try{
-    if(map.getLayer("mwa-mask"))return;
     var dark=S.theme==="dark";
     var world=[[100.0,13.2],[101.3,13.2],[101.3,14.3],[100.0,14.3],[100.0,13.2]];
+    // basemap-dim: หรี่ basemap ทั้งแผนที่ (ป้ายชื่อ/ถนน) ให้จางลง — วางก่อน mask และก่อนตึก 3D
+    if(!map.getSource("dim-src"))map.addSource("dim-src",{type:"geojson",data:{type:"Feature",geometry:{type:"Polygon",coordinates:[world]}}});
+    if(!map.getLayer("basemap-dim"))map.addLayer({id:"basemap-dim",type:"fill",source:"dim-src",
+      paint:{"fill-color":dark?"#0a1220":"#f4f6f9","fill-opacity":dark?0.30:0.25}});
+    if(map.getLayer("mwa-mask"))return;
     var hole=MWA_BOUNDARY.features[0].geometry.coordinates[0];
     if(!map.getSource("mwa-mask-src"))map.addSource("mwa-mask-src",{type:"geojson",data:{type:"Feature",geometry:{type:"Polygon",coordinates:[world,hole]}}});
     map.addLayer({id:"mwa-mask",type:"fill",source:"mwa-mask-src",
@@ -666,7 +670,7 @@ function loadData(){
   fetchHubs();
 }
 window.toggleLayer=function(t){S.layersOn[t]=!S.layersOn[t];document.getElementById("btn-"+t).classList.toggle("active",S.layersOn[t]);};
-window.resetView=function(){map.flyTo({center:[100.56,13.74],zoom:10.4,pitch:52,bearing:-14,duration:1400});};
+window.resetView=function(){map.flyTo({center:[100.565,13.725],zoom:10.1,pitch:52,bearing:-14,duration:1400});};
 window.topView=function(){map.flyTo({center:[100.56,13.74],zoom:10.1,pitch:0,bearing:0,duration:1200});};
 
 function renderRanking(){
@@ -1248,7 +1252,7 @@ loadData();
 requestAnimationFrame(animate);
 map.on("load",function(){
   hideLoading();
-  setTimeout(function(){map.flyTo({center:[100.56,13.74],zoom:10.4,pitch:52,bearing:-14,duration:2600});},400);
+  setTimeout(function(){map.flyTo({center:[100.565,13.725],zoom:10.1,pitch:52,bearing:-14,duration:2600});},400);
 });
 setTimeout(hideLoading,4000);
 
