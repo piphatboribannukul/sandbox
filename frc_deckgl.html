@@ -89,14 +89,31 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
 
 .mock-badge{position:fixed;bottom:58px;left:50%;transform:translateX(-50%);z-index:10;font-size:9px;color:#fbbf24;background:rgba(251,191,36,0.09);border:1px solid rgba(251,191,36,0.22);padding:4px 12px;border-radius:12px;backdrop-filter:blur(6px)}
 
-#loading{position:fixed;inset:0;z-index:100;background:#04070f;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s}
+#loading{position:fixed;inset:0;z-index:100;background:#04070f;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s;overflow:hidden}
+#loading::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 62% 46% at 50% 42%,rgba(34,211,238,0.10),transparent 70%)}
+#loading::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(34,211,238,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,0.05) 1px,transparent 1px);background-size:44px 44px;-webkit-mask-image:radial-gradient(ellipse 72% 62% at 50% 45%,#000 25%,transparent 75%);mask-image:radial-gradient(ellipse 72% 62% at 50% 45%,#000 25%,transparent 75%)}
+.ld-wrap{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;width:min(360px,84vw)}
+.ld-logo{font-family:monospace;font-size:10.5px;letter-spacing:6px;color:#22d3ee;text-shadow:0 0 18px rgba(34,211,238,0.55);margin-bottom:8px}
+.ld-title{font-size:16.5px;font-weight:800;color:#e8f2fb;letter-spacing:0.4px;margin-bottom:28px;text-align:center}
+.ld-track{width:100%;height:9px;border-radius:99px;background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);overflow:hidden;position:relative;box-shadow:inset 0 1px 4px rgba(0,0,0,0.65),0 0 22px rgba(34,211,238,0.12)}
+.ld-fill{height:100%;width:3%;border-radius:99px;background:linear-gradient(90deg,#0891b2,#22d3ee 60%,#7dd3fc);box-shadow:0 0 16px rgba(34,211,238,0.8);transition:width 0.45s cubic-bezier(.25,.8,.3,1);position:relative;overflow:hidden}
+.ld-fill::after{content:"";position:absolute;inset:0;width:46%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent);animation:ldsheen 1.15s ease-in-out infinite}
+@keyframes ldsheen{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+.ld-meta{display:flex;justify-content:space-between;width:100%;margin-top:11px;font-size:11.5px}
+.ld-status{color:#5b7089}
+.ld-pct{font-family:monospace;color:#67e8f9;font-weight:700;text-shadow:0 0 10px rgba(34,211,238,0.4)}
 .spin{width:44px;height:44px;border:3px solid rgba(34,211,238,0.15);border-top-color:#22d3ee;border-radius:50%;animation:s 0.9s linear infinite;box-shadow:0 0 20px rgba(34,211,238,0.2)}
 @keyframes s{to{transform:rotate(360deg)}}
 .deck-tooltip{font-family:'IBM Plex Sans Thai'!important;background:rgba(7,13,26,0.95)!important;border:1px solid rgba(34,211,238,0.35)!important;border-radius:10px!important;padding:9px 13px!important;color:#c8d6e5!important;font-size:12px!important;box-shadow:0 6px 24px rgba(0,0,0,0.5)!important}
 </style>
 </head>
 <body>
-<div id="loading"><div class="spin"></div><p style="margin-top:16px;font-size:13px;color:#5b7089">กำลังโหลด deck.gl 3D Digital Twin...</p></div>
+<div id="loading"><div class="ld-wrap">
+  <div class="ld-logo">MWA &middot; FRC DIGITAL TWIN</div>
+  <div class="ld-title">ระบบตรวจสอบคุณภาพน้ำระบบจ่ายคลอรีนปลายสาย</div>
+  <div class="ld-track"><div class="ld-fill" id="ldFill"></div></div>
+  <div class="ld-meta"><span class="ld-status" id="ldStatus">กำลังเริ่มระบบ...</span><span class="ld-pct" id="ldPct">0%</span></div>
+</div></div>
 <div id="map"></div>
 <div id="errToast" style="display:none;position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(127,29,29,0.94);border:1px solid #f87171;color:#fecaca;font-size:11px;padding:7px 15px;border-radius:8px;max-width:84%;backdrop-filter:blur(6px);text-align:center"></div>
 
@@ -613,7 +630,7 @@ function loadLive(){
     var lvl=sc.LEVEL!=null?sc.LEVEL:(sc.Level!=null?sc.Level:4.0);
     S.stations[id]=Object.assign({},m,{stationId:id,fis:sc.FLOW_INLET_STATION,frcIn:frcIn,frcOut:frcOut,turb:sc.Turbidity,tempOut:sc.TEMP_OUTLET/100,ph:sc.PH,dt:sc.LogDateTime,kt:kt,t:(lvl*m.area)/m.flow,kHist:m.k,bypass:bypass,dosing:dosing,p1:sc.PUMP1_STS,p2:sc.PUMP2_STS,conduct:sc.Conduct,hasBooster:dosing&&!bypass,level:lvl});
     pushHist(id,frcOut);ok++;
-  }).catch(function(){});})).then(function(){
+  }).catch(function(){}).then(function(){lpStation();});})).then(function(){
     if(ok===0){
       return loadPublic().catch(function(){
         showErr("เชื่อม API ไม่ได้ (intranet+public) — ใช้ข้อมูลจำลอง");
@@ -666,7 +683,7 @@ function fetchHubs(){
 function loadData(){
   // โหลดข้อมูลสถานีให้เสร็จก่อน แล้วค่อย merge ระดับน้ำ/อัตราจ่ายจาก smartmap
   var p=USE_MOCK?(loadMock(),Promise.resolve()):loadLive();
-  p.then(function(){fetchSmart();});
+  p.then(function(){fetchSmart();revealWhenReady("data");});
   fetchHubs();
 }
 window.toggleLayer=function(t){S.layersOn[t]=!S.layersOn[t];document.getElementById("btn-"+t).classList.toggle("active",S.layersOn[t]);};
@@ -1248,13 +1265,36 @@ setInterval(updateClock,1000);updateClock();
 
 function hideLoading(){var o=document.getElementById("loading");if(o){o.style.opacity="0";setTimeout(function(){o.style.display="none";},600);}}
 
+// เปิดฉากเมื่อ "แผนที่ + ข้อมูลสถานี" พร้อมทั้งคู่ — กันภาพค้างเห็นถัง/ท่อก่อนข้อมูลมา
+var _rv={map:false,data:false,done:false};
+// progress bar: หน่วย = สถานีทั้งหมด + แผนที่ 1 หน่วย
+var _lp={done:0,total:IDS.length+1,st:0};
+function lpSet(pc,label){
+  var f=document.getElementById("ldFill"),p=document.getElementById("ldPct"),s=document.getElementById("ldStatus");
+  if(f)f.style.width=Math.max(pc,3)+"%";
+  if(p)p.textContent=pc+"%";
+  if(s&&label)s.textContent=label;
+}
+function lpTick(label){
+  if(_rv.done)return;
+  _lp.done=Math.min(_lp.done+1,_lp.total);
+  lpSet(Math.round(_lp.done/_lp.total*100),label);
+}
+function lpStation(){_lp.st++;lpTick("ดึงข้อมูลสถานี "+Math.min(_lp.st,IDS.length)+"/"+IDS.length+"...");}
+window.revealWhenReady=function(what){
+  _rv[what]=true;
+  if(_rv.done||!_rv.map||!_rv.data)return;
+  _rv.done=true;
+  try{buildLayers();}catch(e){}
+  lpSet(100,"พร้อมใช้งาน");
+  setTimeout(hideLoading,420);
+  setTimeout(function(){map.flyTo({center:[100.565,13.725],zoom:10.1,pitch:52,bearing:-14,duration:2600});},650);
+};
 loadData();
 requestAnimationFrame(animate);
-map.on("load",function(){
-  hideLoading();
-  setTimeout(function(){map.flyTo({center:[100.565,13.725],zoom:10.1,pitch:52,bearing:-14,duration:2600});},400);
-});
-setTimeout(hideLoading,4000);
+map.on("load",function(){lpTick("แผนที่พร้อม — รอข้อมูลสถานี...");revealWhenReady("map");});
+// กันค้าง: ถ้า 15 วิแล้วยังไม่ครบ (API ล่ม/ช้า) เปิดฉากด้วยเท่าที่มี
+setTimeout(function(){_rv.map=true;revealWhenReady("data");},15000);
 
 var cd=REFRESH;setInterval(function(){cd--;if(cd<=0){loadData();if(S.detailOpen)loadChlorineInfo(S.detailOpen);setTimeout(fbLogPumps,9000);cd=REFRESH;}},1000);
 setTimeout(fbLogPumps,15000);
