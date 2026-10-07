@@ -89,6 +89,23 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
 
 .mock-badge{position:fixed;bottom:58px;left:50%;transform:translateX(-50%);z-index:10;font-size:9px;color:#fbbf24;background:rgba(251,191,36,0.09);border:1px solid rgba(251,191,36,0.22);padding:4px 12px;border-radius:12px;backdrop-filter:blur(6px)}
 
+/* ===== ALARM CONFIG PANEL ===== */
+#alCfg{display:none;position:fixed;right:16px;bottom:62px;z-index:57;width:252px;padding:13px 15px;font-size:12px;color:#c8d6e5}
+.alc-h{font-size:9.5px;color:#5b7089;font-weight:800;letter-spacing:1.2px;margin:9px 0 3px}
+.alc-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0}
+.alc-row input[type=number]{width:64px;background:rgba(10,20,36,0.92);border:1px solid rgba(34,211,238,0.3);color:#c8e6f5;border-radius:8px;padding:4px 7px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.alc-row input[type=checkbox]{accent-color:#22d3ee;width:15px;height:15px}
+.alc-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.alc-btn{flex:1;background:rgba(34,211,238,0.14);border:1px solid rgba(34,211,238,0.4);color:#67e8f9;border-radius:9px;padding:6px 0;cursor:pointer;font-family:inherit;font-weight:700;font-size:12px}
+.alc-btn.ghost{background:transparent;border-color:rgba(100,116,139,0.4);color:#8aa3bd}
+/* ===== ALARM ===== */
+#alarmVig{display:none;position:fixed;inset:0;z-index:55;pointer-events:none;animation:alvig 1.1s ease-in-out infinite}
+@keyframes alvig{0%,100%{box-shadow:inset 0 0 90px 18px rgba(239,68,68,0.26)}50%{box-shadow:inset 0 0 160px 46px rgba(239,68,68,0.58)}}
+#alarmBanner{display:none;position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:56;align-items:center;gap:9px;background:rgba(68,8,10,0.93);border:1px solid rgba(248,113,113,0.65);border-radius:14px;padding:8px 15px;color:#fecaca;font-size:12.5px;font-weight:700;backdrop-filter:blur(8px);box-shadow:0 8px 32px rgba(239,68,68,0.4);max-width:86vw;flex-wrap:wrap}
+.al-dot{width:11px;height:11px;border-radius:50%;background:#ef4444;box-shadow:0 0 14px #ef4444;animation:alblink 0.8s steps(2,start) infinite;flex:none}
+@keyframes alblink{to{visibility:hidden}}
+.al-chip{background:rgba(239,68,68,0.22);border:1px solid rgba(248,113,113,0.5);border-radius:9px;padding:2px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px}
+.al-btn{background:rgba(254,202,202,0.12);border:1px solid rgba(248,113,113,0.5);color:#fecaca;border-radius:9px;padding:3px 12px;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:700}
 #loading{position:fixed;inset:0;z-index:100;background:#04070f;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s;overflow:hidden}
 #loading::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 62% 46% at 50% 42%,rgba(34,211,238,0.10),transparent 70%)}
 #loading::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(34,211,238,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,0.05) 1px,transparent 1px);background-size:44px 44px;-webkit-mask-image:radial-gradient(ellipse 72% 62% at 50% 45%,#000 25%,transparent 75%);mask-image:radial-gradient(ellipse 72% 62% at 50% 45%,#000 25%,transparent 75%)}
@@ -121,12 +138,16 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
   <div><h1>ระบบตรวจสอบคุณภาพน้ำระบบจ่ายคลอรีนปลายสาย</h1><div class="sub">FRC Digital Twin • MWA Chlorine Decay Monitoring</div></div>
   <div style="display:flex;gap:10px;align-items:center;pointer-events:auto">
     <div style="display:flex;gap:4px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:3px">
+      <button id="pm-frc" class="theme-btn active" onclick="setParam('frc')"><span style="color:#22d3ee">●</span> คลอรีนอิสระคงเหลือ</button>
+      <button id="pm-turb" class="theme-btn" onclick="setParam('turb')"><span style="color:#eab308">●</span> ความขุ่น</button>
+    </div>
+    <div style="display:flex;gap:4px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:3px">
       <button id="btn-dark" class="theme-btn active" onclick="setTheme('dark')">🌑 มืด</button>
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
         <button class="theme-btn" onclick="uiZoom(-0.15)" title="ย่อป้ายสถานี">ก−</button>
         <button class="theme-btn" onclick="uiZoom(0.15)" title="ขยายป้ายสถานี">ก+</button>
     </div>
-    <a href="frc_chlorine.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(251,191,36,0.25);border-radius:20px;padding:6px 14px;font-size:11px;color:#fbbf24;text-decoration:none;font-weight:600">🧪 คลอรีนคงเหลือ</a>
+    <a href="frc_chlorine.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(251,191,36,0.25);border-radius:20px;padding:6px 14px;font-size:11px;color:#fbbf24;text-decoration:none;font-weight:600">🧪 สต็อกคลอรีน (ถัง)</a>
 <a href="frc_dashboard.html" target="_blank" style="display:flex;align-items:center;gap:5px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:6px 14px;font-size:11px;color:#67e8f9;text-decoration:none;font-weight:600">📊 Dashboard</a>
     
     <div class="badge"><div class="dot"></div><span>DEMO MODE</span></div>
@@ -139,12 +160,14 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
 <div class="info-panel glass" id="infoPanel"></div>
 
 <div class="legend glass">
+  <div id="legendParam">
   <div style="font-size:9px;color:#5b7089;margin-bottom:6px;font-weight:700;letter-spacing:1px">FRC OUTLET STATUS</div>
   <div class="legend-item"><div class="legend-dot" style="background:#22d3ee;color:#22d3ee"></div><span>ผ่านเกณฑ์ (≥0.8 mg/L)</span></div>
   <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;color:#fbbf24"></div><span>ระวัง (0.5–0.8)</span></div>
   <div class="legend-item"><div class="legend-dot" style="background:#f87171;color:#f87171"></div><span>ต่ำกว่าเกณฑ์ (<0.5)</span></div>
   <div class="legend-item"><div class="legend-dot" style="background:#a78bfa;color:#a78bfa"></div><span>Booster Active (FRC ออก &gt; เข้า)</span></div>
   <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;color:#f59e0b"></div><span>⇄ Bypass (น้ำไม่ผ่านถัง)</span></div>
+  </div>
   <div class="legend-item" style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(51,65,85,0.3)"><div class="legend-line" style="background:#22c55e;color:#22c55e;height:5px"></div><span>อุโมงค์ MTR → PK TP RB</span></div>
   <div class="legend-item"><div class="legend-line" style="background:#f97316;color:#f97316;height:5px"></div><span>อุโมงค์ TR1 → LP TP SR (+RB)</span></div>
   <div class="legend-item"><div class="legend-line" style="background:#eab308;color:#eab308;height:5px"></div><span>อุโมงค์ TR2 → LA KT SR (+BP)</span></div>
@@ -155,7 +178,30 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
 
 <div class="mock-badge">โหมด LIVE: intranet → public API → demo อัตโนมัติ | k จากข้อมูล ม.ค.-มี.ค. 69</div>
 
+<div id="alarmVig"></div>
+<div id="alarmBanner"></div>
+<div id="alCfg" class="glass">
+  <div style="font-weight:800;color:#e8f2fb;font-size:13px;margin-bottom:2px">⚙ ตั้งค่าแจ้งเตือน</div>
+  <div class="alc-h">FRC ขาออก (mg/L) — เตือนเมื่อต่ำกว่า</div>
+  <div class="alc-row"><span><span class="alc-dot" style="background:#f87171"></span>แดง (วิกฤต) &lt;</span><input type="number" id="alFrcRed" step="0.05" min="0"></div>
+  <div class="alc-row"><span><span class="alc-dot" style="background:#fbbf24"></span>เหลือง (เฝ้าระวัง) &lt;</span><input type="number" id="alFrcYel" step="0.05" min="0"></div>
+  <div class="alc-h">ความขุ่น (NTU) — เตือนเมื่อเกิน</div>
+  <div class="alc-row"><span><span class="alc-dot" style="background:#fbbf24"></span>เหลือง (เฝ้าระวัง) &gt;</span><input type="number" id="alTbYel" step="0.5" min="0"></div>
+  <div class="alc-row"><span><span class="alc-dot" style="background:#f87171"></span>แดง (วิกฤต) &gt;</span><input type="number" id="alTbRed" step="0.5" min="0"></div>
+  <div class="alc-h">พฤติกรรม</div>
+  <div class="alc-row"><span>วาบขอบจอเมื่อระดับแดง</span><input type="checkbox" id="alVig"></div>
+  <div class="alc-row"><span>เสียงเตือนระดับเหลืองด้วย</span><input type="checkbox" id="alSndYel"></div>
+  <button class="alc-btn" style="width:100%;margin-top:10px;background:rgba(239,68,68,0.14);border-color:rgba(248,113,113,0.5);color:#fca5a5" onclick="testAlarm()">🔔 ทดสอบสัญญาณเตือน (10 วินาที)</button>
+  <div style="display:flex;gap:7px;margin-top:8px">
+    <button class="alc-btn" onclick="saveAlCfg()">บันทึก</button>
+    <button class="alc-btn ghost" onclick="resetAlCfg()">ค่าเริ่มต้น</button>
+    <button class="alc-btn ghost" style="flex:0 0 46px" onclick="document.getElementById('alCfg').style.display='none'">ปิด</button>
+  </div>
+  <div style="font-size:10px;color:#48596e;margin-top:8px">ระดับแดง: ไซเรน+วาบจอ+แหวนแดง · ระดับเหลือง: แบนเนอร์+แหวนเหลือง</div>
+</div>
 <div class="ctrl">
+  <button id="btn-snd" onclick="alarmBtn(event)" title="คลิก = เปิด/ปิดเสียง | Shift+คลิก = ทดสอบ alarm">🔔 เสียงเตือน</button>
+  <button onclick="toggleAlCfg()" title="ตั้งค่าแจ้งเตือน">⚙ ตั้งค่าเตือน</button>
   <button id="btn-pipe" class="active" onclick="toggleLayer('pipe')">ท่อประธาน</button>
   <button id="btn-area" class="active" onclick="toggleLayer('area')">พื้นที่บริการ</button>
   <button onclick="resetView()">มุมมองเริ่มต้น</button>
@@ -305,6 +351,50 @@ function frcColor(fo,booster){
   if(fo>0)return dark?[248,113,113]:[220,38,38];
   return dark?[100,116,139]:[71,85,105];
 }
+// ===== พารามิเตอร์แสดงผล: frc | turb (เกณฑ์ความขุ่น กปน. < 4 NTU) =====
+function turbColor(t){
+  var dark=S.theme==="dark";
+  if(t==null)return dark?[100,116,139]:[71,85,105];
+  if(t>4)return dark?[248,113,113]:[220,38,38];
+  if(t>1)return dark?[251,191,36]:[202,138,4];
+  return dark?[34,211,238]:[2,132,199];
+}
+function paramColor(d){return S.param==="turb"?turbColor(d.turb):frcColor(d.frcOut,d.hasBooster);}
+function setLegend(){
+  var el=document.getElementById("legendParam");if(!el)return;
+  var t='<div style="font-size:9px;color:#5b7089;margin-bottom:6px;font-weight:700;letter-spacing:1px">';
+  if(S.param==="turb"){
+    el.innerHTML=t+'TURBIDITY STATUS</div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#22d3ee;color:#22d3ee"></div><span>ใส (&le;1 NTU)</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#fbbf24;color:#fbbf24"></div><span>ระวัง (1&ndash;4)</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#f87171;color:#f87171"></div><span>เกินเกณฑ์ (&gt;4 NTU)</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#64748b;color:#64748b"></div><span>ไม่มีข้อมูล</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#f59e0b;color:#f59e0b"></div><span>&#8644; Bypass (น้ำไม่ผ่านถัง)</span></div>';
+  }else{
+    el.innerHTML=t+'FRC OUTLET STATUS</div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#22d3ee;color:#22d3ee"></div><span>ผ่านเกณฑ์ (&ge;0.8 mg/L)</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#fbbf24;color:#fbbf24"></div><span>ระวัง (0.5&ndash;0.8)</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#f87171;color:#f87171"></div><span>ต่ำกว่าเกณฑ์ (&lt;0.5)</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#a78bfa;color:#a78bfa"></div><span>Booster Active (FRC ออก &gt; เข้า)</span></div>'
+      +'<div class="legend-item"><div class="legend-dot" style="background:#f59e0b;color:#f59e0b"></div><span>&#8644; Bypass (น้ำไม่ผ่านถัง)</span></div>';
+  }
+}
+window.setParam=function(p){
+  S.param=p==="turb"?"turb":"frc";
+  try{localStorage.setItem("frcParam",S.param);}catch(e){}
+  var f=document.getElementById("pm-frc"),t=document.getElementById("pm-turb");
+  if(f)f.classList.toggle("active",S.param==="frc");
+  if(t)t.classList.toggle("active",S.param==="turb");
+  setLegend();try{buildLayers();}catch(e){}
+};
+window.toggleParam=function(){setParam(S.param==="turb"?"frc":"turb");};
+(function(){
+  try{S.param=localStorage.getItem("frcParam")==="turb"?"turb":"frc";}catch(e){S.param="frc";}
+  var f=document.getElementById("pm-frc"),t=document.getElementById("pm-turb");
+  if(f)f.classList.toggle("active",S.param==="frc");
+  if(t)t.classList.toggle("active",S.param==="turb");
+  if(S.param==="turb")setLegend();
+})();
 
 function mkMapStyle(theme){
   // OpenFreeMap vector styles — ฟรีถาวร ไม่มี key (dark = สายเดียวกับ dark-matter เดิม)
@@ -384,7 +474,7 @@ function icDim(vw,vh,anchorV,disp){var sc=disp*DPR*(S.uiScale||1)/vh;return{w:Ma
 // การ์ดข้อมูลกะทัดรัด + ถังกว้างเตี้ยขนาดเท่ากันทุกสถานี ฐานปักพื้น + ป้ายระดับที่ผิวน้ำ
 function tankIconURL(d){
   var dark=S.theme==="dark";
-  var c=frcColor(d.frcOut,d.hasBooster),col=hexOf(c);
+  var c=paramColor(d),col=hexOf(c);
   var lite=hexOf(c.map(function(v){return Math.min(v+85,255);}));
   var sel=d.stationId===S.selectedId;
   var byp=!!d.bypass;
@@ -405,6 +495,19 @@ function tankIconURL(d){
   var P=function(x,y){return x+","+y;};
   var simBand=d.sim?('<rect x="4" y="63" width="168" height="17" rx="6" fill="#b45309" fill-opacity="0.96"/>'
     +'<text x="88" y="75.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#fff7ed">⚠ ค่าจำลอง — ยังไม่เชื่อมระบบ</text>'):"";
+  var rowVals;
+  if(S.param==="turb"){
+    var tbTxt=(d.turb!=null)?Number(d.turb).toFixed(2):"-";
+    rowVals='<text x="10" y="43" font-family="sans-serif" font-size="9.5" fill="'+dimC+'">ความขุ่น</text>'
+      +'<text x="62" y="45" font-family="monospace" font-size="17" font-weight="700" fill="'+lite+'">'+tbTxt+'</text>'
+      +'<text x="10" y="57" font-family="sans-serif" font-size="8.5" fill="'+dimC+'">NTU</text>';
+  }else{
+    rowVals='<text x="10" y="42" font-family="sans-serif" font-size="9.5" fill="'+dimC+'">FRC In</text>'
+      +'<text x="47" y="43" font-family="monospace" font-size="14.5" font-weight="700" fill="'+inC+'">'+inTxt+'</text>'
+      +'<text x="90" y="42" font-family="sans-serif" font-size="9.5" fill="'+dimC+'">FRC Out</text>'
+      +'<text x="133" y="43" font-family="monospace" font-size="14.5" font-weight="700" fill="'+outC+'">'+outTxt+'</text>'
+      +'<text x="10" y="57" font-family="sans-serif" font-size="8.5" fill="'+dimC+'">mg/L</text>';
+  }
   var _m=icDim(176,142,132,102);
   var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+_m.w+'" height="'+_m.h+'" viewBox="0 0 176 142">'
     +(dark?'':'<rect x="6" y="7" width="168" height="58" rx="9" fill="#334155" fill-opacity="0.28"/>')
@@ -414,11 +517,7 @@ function tankIconURL(d){
     +'<text x="26" y="23" font-family="monospace" font-size="14" font-weight="700" fill="'+nameC+'">'+d.code+'</text>'
     +'<text x="164" y="22" text-anchor="end" font-family="sans-serif" font-size="10.5" fill="'+dimC+'">'+d.name+'</text>'
     +(byp?'<rect x="58" y="8" width="54" height="15" rx="7" fill="'+bypC+'" fill-opacity="0.16" stroke="'+bypC+'" stroke-width="1"/><text x="85" y="19" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="'+bypC+'">\u21c4 BYPASS</text>':'')
-    +'<text x="10" y="42" font-family="sans-serif" font-size="9.5" fill="'+dimC+'">FRC In</text>'
-    +'<text x="47" y="43" font-family="monospace" font-size="14.5" font-weight="700" fill="'+inC+'">'+inTxt+'</text>'
-    +'<text x="90" y="42" font-family="sans-serif" font-size="9.5" fill="'+dimC+'">FRC Out</text>'
-    +'<text x="133" y="43" font-family="monospace" font-size="14.5" font-weight="700" fill="'+outC+'">'+outTxt+'</text>'
-    +'<text x="10" y="57" font-family="sans-serif" font-size="8.5" fill="'+dimC+'">mg/L</text>'
+    +rowVals
     +'<text x="164" y="57" text-anchor="end" font-family="monospace" font-size="10" font-weight="700" fill="'+dimC+'">\u0e1b\u0e23\u0e34\u0e21\u0e32\u0e15\u0e23 '+vol+' m\u00b3</text>'
     +'<line x1="72" y1="62" x2="72" y2="'+(topY-2)+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="3 2" opacity="0.75"/>'
     +'<ellipse cx="72" cy="'+(botF+2)+'" rx="'+(hw+9)+'" ry="5" fill="#000" opacity="'+(dark?"0.45":"0.16")+'"/>'
@@ -486,6 +585,134 @@ function plantIconURL(d){
   return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
 
+// ===== ALARM SYSTEM: FRC ขาออกต่ำกว่าเกณฑ์ -> จอวาบแดง + แหวนกะพริบ + เสียงไซเรน =====
+// ค่าเริ่มต้น — ผู้ใช้ปรับได้จากปุ่ม ⚙ ตั้งค่าเตือน (เก็บใน localStorage)
+var AL_DEF={frcRed:0.5,frcYel:0.8,tbRed:4,tbYel:2,vig:true,sndYel:false};
+window.AL={active:{},muted:false,ack:false,ctx:null,timer:null,cfg:Object.assign({},AL_DEF)};
+try{AL.muted=localStorage.getItem("frcAlarmMute")==="1";}catch(e){}
+try{var _ac=JSON.parse(localStorage.getItem("frcAlarmCfg")||"null");if(_ac)AL.cfg=Object.assign({},AL_DEF,_ac);}catch(e){}
+function alCtx(){
+  if(!AL.ctx){try{AL.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  if(AL.ctx&&AL.ctx.state==="suspended")AL.ctx.resume().catch(function(){});
+  return AL.ctx;
+}
+function alBeep(){ // ไซเรนสองโทน สูง-ต่ำ-สูง
+  var c=alCtx();if(!c||c.state!=="running")return;
+  var t=c.currentTime;
+  [[880,0,0.28],[622,0.34,0.28],[880,0.68,0.30]].forEach(function(n){
+    var o=c.createOscillator(),g=c.createGain();
+    o.type="square";o.frequency.value=n[0];
+    g.gain.setValueAtTime(0.0001,t+n[1]);
+    g.gain.exponentialRampToValueAtTime(0.13,t+n[1]+0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+n[1]+n[2]);
+    o.connect(g);g.connect(c.destination);
+    o.start(t+n[1]);o.stop(t+n[1]+n[2]+0.05);
+  });
+}
+function checkAlarms(){
+  var now={},cfg=AL.cfg;
+  Object.values(S.stations).forEach(function(st){
+    if(st.sim)return; // ค่าจำลอง (LK2) ไม่ปลุก alarm
+    if(st.frcOut!=null){
+      var t1=st.frcOut<cfg.frcRed?"red":(st.frcOut<cfg.frcYel?"yel":null);
+      if(t1)now[st.stationId+"|frc"]={sid:st.stationId,code:st.code,label:"FRC "+st.frcOut.toFixed(2),tier:t1,since:(AL.active[st.stationId+"|frc"]||{}).since||Date.now()};
+    }
+    if(st.turb!=null){
+      var t2=st.turb>cfg.tbRed?"red":(st.turb>cfg.tbYel?"yel":null);
+      if(t2)now[st.stationId+"|turb"]={sid:st.stationId,code:st.code,label:"ขุ่น "+Number(st.turb).toFixed(1)+" NTU",tier:t2,since:(AL.active[st.stationId+"|turb"]||{}).since||Date.now()};
+    }
+  });
+  if(AL.active.__T)now.__T=AL.active.__T; // คง alarm ทดสอบไว้
+  // ปลดการรับทราบเมื่อมีเหตุใหม่ หรือเหตุเดิมยกระดับเหลือง->แดง
+  if(Object.keys(now).some(function(k){var o=AL.active[k];return !o||(now[k].tier==="red"&&o.tier!=="red");}))AL.ack=false;
+  AL.active=now;
+  renderAlarm();
+}
+function renderAlarm(){
+  var keys=Object.keys(AL.active);
+  var vig=document.getElementById("alarmVig"),bn=document.getElementById("alarmBanner");
+  if(!vig||!bn)return;
+  if(!keys.length){
+    vig.style.display="none";bn.style.display="none";AL.ack=false;
+    if(AL.timer){clearInterval(AL.timer);AL.timer=null;}
+    return;
+  }
+  var hasRed=keys.some(function(k){return AL.active[k].tier==="red";});
+  vig.style.display=(hasRed&&AL.cfg.vig)?"block":"none"; // วาบขอบจอเฉพาะระดับแดง
+  bn.style.display="flex";
+  bn.style.background=hasRed?"rgba(68,8,10,0.93)":"rgba(66,41,4,0.93)";
+  bn.style.borderColor=hasRed?"rgba(248,113,113,0.65)":"rgba(251,191,36,0.6)";
+  bn.style.boxShadow=hasRed?"0 8px 32px rgba(239,68,68,0.4)":"0 8px 32px rgba(245,158,11,0.35)";
+  bn.style.color=hasRed?"#fecaca":"#fde68a";
+  var dot='<span class="al-dot"'+(hasRed?'':' style="background:#f59e0b;box-shadow:0 0 14px #f59e0b"')+'></span>';
+  var chips=keys.map(function(k){var a=AL.active[k];
+    var yel=a.tier!=="red";
+    return '<span class="al-chip"'+(yel?' style="background:rgba(245,158,11,0.2);border-color:rgba(251,191,36,0.55);color:#fde68a"':'')
+      +' onclick="selectStation(\''+(a.sid||"")+'\')">'+a.code+' '+a.label+'</span>';}).join("");
+  bn.innerHTML=dot+'<b>⚠ แจ้งเตือนคุณภาพน้ำ</b>'+chips
+    +'<button class="al-btn" onclick="ackAlarm()">'+(AL.ack?"รับทราบแล้ว ✓":"รับทราบ (หยุดเสียง)")+'</button>';
+  if(!AL.timer){
+    AL.timer=setInterval(function(){if(alShouldBeep())alBeep();},3000);
+    if(alShouldBeep())alBeep();
+  }
+}
+function alShouldBeep(){
+  var ks=Object.keys(AL.active);
+  if(!ks.length||AL.muted||AL.ack)return false;
+  var red=ks.some(function(k){return AL.active[k].tier==="red";});
+  var yel=ks.some(function(k){return AL.active[k].tier!=="red";});
+  return red||(AL.cfg.sndYel&&yel);
+}
+window.ackAlarm=function(){AL.ack=true;renderAlarm();};
+window.alarmBtn=function(e){
+  if(e&&e.shiftKey)return testAlarm();
+  AL.muted=!AL.muted;
+  try{localStorage.setItem("frcAlarmMute",AL.muted?"1":"0");}catch(e2){}
+  var b=document.getElementById("btn-snd");if(b)b.textContent=AL.muted?"🔕 ปิดเสียง":"🔔 เสียงเตือน";
+  if(!AL.muted)alCtx();
+  renderAlarm();
+};
+window.testAlarm=function(){ // Shift+คลิกปุ่มกระดิ่ง = จำลอง alarm ~10 วิ
+  alCtx();
+  AL.active.__T={sid:"",code:"TEST",label:"FRC 0.32",tier:"red",since:Date.now()};AL.ack=false;renderAlarm();
+  setTimeout(function(){delete AL.active.__T;renderAlarm();},10000);
+};
+window.toggleAlCfg=function(){
+  var p=document.getElementById("alCfg");if(!p)return;
+  if(p.style.display!=="block"){fillAlCfg();p.style.display="block";}
+  else p.style.display="none";
+};
+function fillAlCfg(){
+  var c=AL.cfg;
+  [["alFrcRed",c.frcRed],["alFrcYel",c.frcYel],["alTbYel",c.tbYel],["alTbRed",c.tbRed]].forEach(function(x){
+    var e=document.getElementById(x[0]);if(e)e.value=x[1];});
+  var v=document.getElementById("alVig");if(v)v.checked=!!c.vig;
+  var s=document.getElementById("alSndYel");if(s)s.checked=!!c.sndYel;
+}
+window.saveAlCfg=function(){
+  var g=function(id,def){var e=document.getElementById(id),v=parseFloat(e&&e.value);return isNaN(v)?def:v;};
+  AL.cfg.frcRed=g("alFrcRed",AL_DEF.frcRed);
+  AL.cfg.frcYel=Math.max(g("alFrcYel",AL_DEF.frcYel),AL.cfg.frcRed); // เหลืองต้องไม่ต่ำกว่าแดง
+  AL.cfg.tbRed=g("alTbRed",AL_DEF.tbRed);
+  AL.cfg.tbYel=Math.min(g("alTbYel",AL_DEF.tbYel),AL.cfg.tbRed);     // เหลืองต้องไม่เกินแดง
+  AL.cfg.vig=!!((document.getElementById("alVig")||{}).checked);
+  AL.cfg.sndYel=!!((document.getElementById("alSndYel")||{}).checked);
+  try{localStorage.setItem("frcAlarmCfg",JSON.stringify(AL.cfg));}catch(e){}
+  fillAlCfg(); // สะท้อนค่าที่ถูก clamp กลับเข้า input
+  try{checkAlarms();}catch(e){}
+  document.getElementById("alCfg").style.display="none";
+};
+window.resetAlCfg=function(){
+  AL.cfg=Object.assign({},AL_DEF);
+  try{localStorage.removeItem("frcAlarmCfg");}catch(e){}
+  fillAlCfg();try{checkAlarms();}catch(e){}
+};
+(function(){var b=document.getElementById("btn-snd");if(b&&AL.muted)b.textContent="🔕 ปิดเสียง";})();
+// ปลดล็อก AudioContext ด้วย gesture แรกของผู้ใช้ (นโยบายเบราว์เซอร์)
+["click","touchstart","keydown"].forEach(function(ev){
+  window.addEventListener(ev,function h(){alCtx();},{once:true});
+});
+
 function buildLayers(){
   var arr=Object.values(S.stations);
   if(!arr.length)return;
@@ -542,11 +769,25 @@ function buildLayers(){
   };
   L.push(new deck.ScatterplotLayer({id:"pulse",data:arr,getPosition:d=>d.coord,
     getRadius:d=>{var p=phz(d);return 560+p*950*(d.stationId===S.selectedId?1.4:1);},
-    getFillColor:d=>{var p=phz(d);return frcColor(d.frcOut,d.hasBooster).concat([Math.round(70*(1-p))]);},
-    getLineColor:d=>{var p=phz(d);return frcColor(d.frcOut,d.hasBooster).concat([Math.round(160*(1-p))]);},
+    getFillColor:d=>{var p=phz(d);return paramColor(d).concat([Math.round(70*(1-p))]);},
+    getLineColor:d=>{var p=phz(d);return paramColor(d).concat([Math.round(160*(1-p))]);},
     stroked:true,lineWidthMinPixels:1.5,filled:true,
-    updateTriggers:{getRadius:[pulse,S.selectedId],getFillColor:[pulse],getLineColor:[pulse]}}));
-  var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId+"|"+DPR;
+    updateTriggers:{getRadius:[pulse,S.selectedId],getFillColor:[pulse,S.param],getLineColor:[pulse,S.param]}}));
+  // แหวนแดงกะพริบรอบสถานีที่ alarm (ขยาย-จางเป็นจังหวะเร็ว)
+  var _alSid={};Object.values(AL.active).forEach(function(a){
+    if(a.sid)_alSid[a.sid]=(a.tier==="red"||_alSid[a.sid]==="red")?"red":"yel";});
+  var alArr=arr.filter(function(d){return _alSid[d.stationId];});
+  if(alArr.length){
+    var ap=(Date.now()/700)%1;
+    var alSig=Object.keys(_alSid).map(function(k){return k+_alSid[k];}).join();
+    L.push(new deck.ScatterplotLayer({id:"alarm-ring",data:alArr,getPosition:d=>d.coord,
+      getRadius:950+ap*2400,
+      getFillColor:d=>(_alSid[d.stationId]==="red"?[239,68,68]:[245,158,11]).concat([Math.round(42*(1-ap))]),
+      getLineColor:d=>(_alSid[d.stationId]==="red"?[248,113,113]:[251,191,36]).concat([Math.round(235*(1-ap))]),
+      stroked:true,lineWidthMinPixels:3,filled:true,
+      updateTriggers:{getRadius:[ap],getFillColor:[ap,alSig],getLineColor:[ap,alSig]}}));
+  }
+  var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,s.turb,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId+"|"+DPR+"|"+S.param;
   L.push(new deck.IconLayer({id:"tank-icons",data:arr,pickable:true,billboard:true,
     getPosition:d=>d.coord,
     getIcon:function(d){var m=icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
@@ -691,6 +932,7 @@ window.resetView=function(){map.flyTo({center:[100.565,13.725],zoom:10.1,pitch:5
 window.topView=function(){map.flyTo({center:[100.56,13.74],zoom:10.1,pitch:0,bearing:0,duration:1200});};
 
 function renderRanking(){
+  try{checkAlarms();}catch(e){}
   var r=Object.values(S.stations).filter(x=>x.kHist>0).sort((a,b)=>b.kHist-a.kHist);
   document.getElementById("rankList").innerHTML=r.map(function(x,i){
     var kv=x.kHist,col=kv>1.0?"#f87171":kv>0.4?"#fbbf24":"#34d399";
