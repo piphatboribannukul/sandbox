@@ -638,13 +638,15 @@ function renderAlarm(){
     return;
   }
   var hasRed=keys.some(function(k){return AL.active[k].tier==="red";});
-  vig.style.display=(hasRed&&AL.cfg.vig)?"block":"none"; // วาบขอบจอเฉพาะระดับแดง
+  // ตามหลัก ISA-18.2: ยังไม่รับทราบ = กะพริบ+เสียง | รับทราบแล้ว = ไฟนิ่งค้างจนกว่าค่าปกติ
+  vig.style.display=(hasRed&&AL.cfg.vig&&!AL.ack)?"block":"none";
   bn.style.display="flex";
   bn.style.background=hasRed?"rgba(68,8,10,0.93)":"rgba(66,41,4,0.93)";
   bn.style.borderColor=hasRed?"rgba(248,113,113,0.65)":"rgba(251,191,36,0.6)";
   bn.style.boxShadow=hasRed?"0 8px 32px rgba(239,68,68,0.4)":"0 8px 32px rgba(245,158,11,0.35)";
   bn.style.color=hasRed?"#fecaca":"#fde68a";
-  var dot='<span class="al-dot"'+(hasRed?'':' style="background:#f59e0b;box-shadow:0 0 14px #f59e0b"')+'></span>';
+  var dotStyle=(hasRed?'':'background:#f59e0b;box-shadow:0 0 14px #f59e0b;')+(AL.ack?'animation:none;':'');
+  var dot='<span class="al-dot"'+(dotStyle?' style="'+dotStyle+'"':'')+'></span>';
   var chips=keys.map(function(k){var a=AL.active[k];
     var yel=a.tier!=="red";
     return '<span class="al-chip"'+(yel?' style="background:rgba(245,158,11,0.2);border-color:rgba(251,191,36,0.55);color:#fde68a"':'')
@@ -778,8 +780,8 @@ function buildLayers(){
     if(a.sid)_alSid[a.sid]=(a.tier==="red"||_alSid[a.sid]==="red")?"red":"yel";});
   var alArr=arr.filter(function(d){return _alSid[d.stationId];});
   if(alArr.length){
-    var ap=(Date.now()/700)%1;
-    var alSig=Object.keys(_alSid).map(function(k){return k+_alSid[k];}).join();
+    var ap=AL.ack?0.45:(Date.now()/700)%1; // รับทราบแล้ว -> วงนิ่ง
+    var alSig=Object.keys(_alSid).map(function(k){return k+_alSid[k];}).join()+(AL.ack?"|ack":"");
     L.push(new deck.ScatterplotLayer({id:"alarm-ring",data:alArr,getPosition:d=>d.coord,
       getRadius:950+ap*2400,
       getFillColor:d=>(_alSid[d.stationId]==="red"?[239,68,68]:[245,158,11]).concat([Math.round(42*(1-ap))]),
