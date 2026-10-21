@@ -511,21 +511,6 @@ function tankIconURL(d){
   var dark=S.theme==="dark";
   var c=paramColor(d),col=hexOf(c);
   var lite=hexOf(c.map(function(v){return Math.min(v+85,255);}));
-  if(d.compact){ // ชิปย่อของ LK2 ตอน zoom ไกล
-    var cBg=dark?"#0a1526":"#ffffff",cNm=dark?"#e2eefc":"#0b1f33",cDm=dark?"#8aa3bd":"#3f5468";
-    var vTxt=S.param==="turb"
-      ?((d.turb!=null?Number(d.turb).toFixed(2):"-")+" NTU")
-      :((d.frcOut!=null?d.frcOut.toFixed(2):"-")+" mg/L");
-    var mc=icDim(188,30,28,26);
-    var csvg='<svg xmlns="http://www.w3.org/2000/svg" width="'+mc.w+'" height="'+mc.h+'" viewBox="0 0 188 30">'
-      +'<rect x="2" y="2" width="184" height="26" rx="13" fill="'+cBg+'" fill-opacity="0.95" stroke="'+col+'" stroke-width="1.6"/>'
-      +'<circle cx="16" cy="15" r="4" fill="'+col+'"/>'
-      +'<text x="25" y="19.5" font-family="monospace" font-size="12.5" font-weight="700" fill="'+cNm+'">LK2</text>'
-      +'<text x="60" y="19" font-family="sans-serif" font-size="9.5" fill="'+cDm+'">\u0e25\u0e32\u0e14\u0e01\u0e23\u0e30\u0e1a\u0e31\u0e07 2 \u26a0</text>'
-      +'<text x="180" y="19.5" text-anchor="end" font-family="monospace" font-size="11.5" font-weight="700" fill="'+lite+'">'+vTxt+'</text>'
-      +'</svg>';
-    return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(csvg);
-  }
   var sel=d.stationId===S.selectedId;
   var byp=!!d.bypass;
   var bypC=dark?"#fbbf24":"#b45309";
@@ -557,6 +542,22 @@ function tankIconURL(d){
       +'<text x="90" y="42" font-family="sans-serif" font-size="9.5" fill="'+dimC+'">FRC Out</text>'
       +'<text x="133" y="43" font-family="monospace" font-size="14.5" font-weight="700" fill="'+outC+'">'+outTxt+'</text>'
       +'<text x="10" y="57" font-family="sans-serif" font-size="8.5" fill="'+dimC+'">mg/L</text>';
+  }
+  if(d.compact){ // การ์ดเต็มแบบไม่มีถัง — วางเคียงขวาการ์ด LK ตอน zoom ไกล
+    var mcc=icDim(176,84,82,60);
+    var cs='<svg xmlns="http://www.w3.org/2000/svg" width="'+mcc.w+'" height="'+mcc.h+'" viewBox="0 0 176 84">'
+      +(dark?'':'<rect x="6" y="7" width="168" height="58" rx="9" fill="#334155" fill-opacity="0.28"/>')
+      +'<rect x="4" y="4" width="168" height="58" rx="9" fill="'+cardBg+'" fill-opacity="'+(dark?"0.94":"0.99")+'" stroke="'+(byp?bypC:(sel?lite:col))+'" stroke-width="'+(sel?"2.4":(dark?"1.2":"1.6"))+'"/>'
+      +'<line x1="13" y1="4" x2="38" y2="4" stroke="'+lite+'" stroke-width="2.5"/>'
+      +'<circle cx="16" cy="18" r="4" fill="'+col+'"/>'
+      +'<text x="26" y="23" font-family="monospace" font-size="14" font-weight="700" fill="'+nameC+'">'+d.code+'</text>'
+      +'<text x="164" y="22" text-anchor="end" font-family="sans-serif" font-size="10.5" fill="'+dimC+'">'+d.name+'</text>'
+      +(byp?'<rect x="58" y="8" width="54" height="15" rx="7" fill="'+bypC+'" fill-opacity="0.16" stroke="'+bypC+'" stroke-width="1"/><text x="85" y="19" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="'+bypC+'">\u21c4 BYPASS</text>':'')
+      +rowVals
+      +'<text x="164" y="57" text-anchor="end" font-family="monospace" font-size="10" font-weight="700" fill="'+dimC+'">\u0e1b\u0e23\u0e34\u0e21\u0e32\u0e15\u0e23 '+vol+' m\u00b3</text>'
+      +simBand
+      +'</svg>';
+    return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(cs);
   }
   var _m=icDim(176,142,132,102);
   var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+_m.w+'" height="'+_m.h+'" viewBox="0 0 176 142">'
@@ -837,9 +838,9 @@ function buildLayers(){
   var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,s.turb,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId+"|"+DPR+"|"+S.param+"|"+(lk2Compact?1:0);
   L.push(new deck.IconLayer({id:"tank-icons",data:arr,pickable:true,billboard:true,
     getPosition:d=>d.coord,
-    getIcon:function(d){var m=d.compact?icDim(188,30,28,26):icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
-    getSize:function(d){return Math.round((d.compact?26:102)*(S.uiScale||1));},sizeUnits:"pixels",
-    getPixelOffset:function(d){var us=S.uiScale||1;return d.compact?[Math.round(14*us),-Math.round(116*us)]:[0,0];},
+    getIcon:function(d){var m=d.compact?icDim(176,84,82,60):icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
+    getSize:function(d){return Math.round((d.compact?60:102)*(S.uiScale||1));},sizeUnits:"pixels",
+    getPixelOffset:function(d){var us=S.uiScale||1;return d.compact?[Math.round(133*us),-Math.round(36*us)]:[0,0];},
     updateTriggers:{getIcon:[iconSig,S.uiScale],getSize:[S.uiScale,lk2Compact],getPixelOffset:[S.uiScale,lk2Compact]}}));
   // Hub สูบส่ง — ถังตกตะกอน (แบบ C)
   L.push(new deck.IconLayer({id:"hubs",data:HUBS,pickable:true,billboard:true,
