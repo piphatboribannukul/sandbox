@@ -201,6 +201,8 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
 <div id="alarmBanner"></div>
 <div id="alCfg" class="glass">
   <div style="font-weight:800;color:#e8f2fb;font-size:13px;margin-bottom:2px">⚙ ตั้งค่าแจ้งเตือน</div>
+  <div class="alc-h">ผู้ใช้จอนี้ — รับเตือนเฉพาะสถานี</div>
+  <div class="alc-row"><span>สถานี</span><select id="alRole" style="flex:1;max-width:150px;background:rgba(10,20,36,0.92);border:1px solid rgba(34,211,238,0.3);color:#c8e6f5;border-radius:8px;padding:4px 7px;font-family:inherit;font-size:12px"></select></div>
   <div class="alc-h">FRC ขาออก (mg/L) — เตือนเมื่อต่ำกว่า</div>
   <div class="alc-row"><span><span class="alc-dot" style="background:#f87171"></span>แดง (วิกฤต) &lt;</span><input type="number" id="alFrcRed" step="0.05" min="0"></div>
   <div class="alc-row"><span><span class="alc-dot" style="background:#fbbf24"></span>เหลือง (เฝ้าระวัง) &lt;</span><input type="number" id="alFrcYel" step="0.05" min="0"></div>
@@ -642,6 +644,12 @@ var AL_DEF={frcRed:0.5,frcYel:0.8,tbRed:4,tbYel:2,vig:true,sndYel:false};
 window.AL={active:{},muted:false,ack:false,ctx:null,timer:null,cfg:Object.assign({},AL_DEF)};
 try{AL.muted=localStorage.getItem("frcAlarmMute")==="1";}catch(e){}
 try{var _ac=JSON.parse(localStorage.getItem("frcAlarmCfg")||"null");if(_ac)AL.cfg=Object.assign({},AL_DEF,_ac);}catch(e){}
+S.role="ALL";try{S.role=localStorage.getItem("frcRole")||"ALL";}catch(e){}
+function roleBtnLabel(){
+  var b=null,bs=document.querySelectorAll(".ctrl button");
+  bs.forEach(function(x){if(/ตั้งค่าเตือน/.test(x.textContent))b=x;});
+  if(b)b.textContent="⚙ ตั้งค่าเตือน"+(S.role!=="ALL"?" · "+S.role:"");
+}
 function alCtx(){
   if(!AL.ctx){try{AL.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   if(AL.ctx&&AL.ctx.state==="suspended")AL.ctx.resume().catch(function(){});
@@ -664,6 +672,7 @@ function checkAlarms(){
   var now={},cfg=AL.cfg;
   Object.values(S.stations).forEach(function(st){
     if(st.sim)return; // ค่าจำลอง (LK2) ไม่ปลุก alarm
+    if(S.role&&S.role!=="ALL"&&st.code!==S.role)return; // จอสถานี: เตือนเฉพาะสถานีตัวเอง
     if(st.frcOut!=null){
       var t1=st.frcOut<cfg.frcRed?"red":(st.frcOut<cfg.frcYel?"yel":null);
       if(t1)now[st.stationId+"|frc"]={sid:st.stationId,code:st.code,label:"FRC "+st.frcOut.toFixed(2),tier:t1,since:(AL.active[st.stationId+"|frc"]||{}).since||Date.now()};
@@ -737,6 +746,13 @@ window.toggleAlCfg=function(){
 };
 function fillAlCfg(){
   var c=AL.cfg;
+  var r=document.getElementById("alRole");
+  if(r){
+    var codes=[];Object.values(META).forEach(function(m){if(codes.indexOf(m.code)<0)codes.push(m.code);});
+    r.innerHTML='<option value="ALL">ศูนย์ควบคุม (ทุกสถานี)</option>'
+      +codes.map(function(cd){return '<option value="'+cd+'">'+cd+' เท่านั้น</option>';}).join("");
+    r.value=(S.role&&(S.role==="ALL"||codes.indexOf(S.role)>=0))?S.role:"ALL";
+  }
   [["alFrcRed",c.frcRed],["alFrcYel",c.frcYel],["alTbYel",c.tbYel],["alTbRed",c.tbRed]].forEach(function(x){
     var e=document.getElementById(x[0]);if(e)e.value=x[1];});
   var v=document.getElementById("alVig");if(v)v.checked=!!c.vig;
@@ -750,8 +766,11 @@ window.saveAlCfg=function(){
   AL.cfg.tbYel=Math.min(g("alTbYel",AL_DEF.tbYel),AL.cfg.tbRed);     // เหลืองต้องไม่เกินแดง
   AL.cfg.vig=!!((document.getElementById("alVig")||{}).checked);
   AL.cfg.sndYel=!!((document.getElementById("alSndYel")||{}).checked);
+  var r=document.getElementById("alRole");
+  if(r){S.role=r.value||"ALL";try{localStorage.setItem("frcRole",S.role);}catch(e){}}
   try{localStorage.setItem("frcAlarmCfg",JSON.stringify(AL.cfg));}catch(e){}
   fillAlCfg(); // สะท้อนค่าที่ถูก clamp กลับเข้า input
+  roleBtnLabel();
   try{checkAlarms();}catch(e){}
   document.getElementById("alCfg").style.display="none";
 };
@@ -760,7 +779,7 @@ window.resetAlCfg=function(){
   try{localStorage.removeItem("frcAlarmCfg");}catch(e){}
   fillAlCfg();try{checkAlarms();}catch(e){}
 };
-(function(){var b=document.getElementById("btn-snd");if(b&&AL.muted)b.textContent="🔕 ปิดเสียง";})();
+(function(){var b=document.getElementById("btn-snd");if(b&&AL.muted)b.textContent="🔕 ปิดเสียง";roleBtnLabel();})();
 // ปลดล็อก AudioContext ด้วย gesture แรกของผู้ใช้ (นโยบายเบราว์เซอร์)
 ["click","touchstart","keydown"].forEach(function(ev){
   window.addEventListener(ev,function h(){alCtx();},{once:true});
