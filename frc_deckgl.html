@@ -550,7 +550,7 @@ function hexOf(c){return "#"+c.map(function(v){return ("0"+v.toString(16)).slice
 // ความคมชัด: rasterize SVG ที่ขนาดพิกเซลจริงบนจอ (getSize x devicePixelRatio) = วาด 1:1 ไม่ย่อไม่ขยาย
 var DPR=Math.max(1,Math.min(window.devicePixelRatio||1,3));
 window.addEventListener("resize",function(){DPR=Math.max(1,Math.min(window.devicePixelRatio||1,3));});
-function icDim(vw,vh,anchorV,disp){var sc=disp*DPR*(S.uiScale||1)/vh;return{w:Math.round(vw*sc),h:Math.round(vh*sc),a:Math.round(anchorV*sc)};}
+function icDim(vw,vh,anchorV,disp){var ss=Math.min(DPR*2,4);var sc=disp*ss*(S.uiScale||1)/vh;return{w:Math.round(vw*sc),h:Math.round(vh*sc),a:Math.round(anchorV*sc)};}
 // การ์ดข้อมูลกะทัดรัด + ถังกว้างเตี้ยขนาดเท่ากันทุกสถานี ฐานปักพื้น + ป้ายระดับที่ผิวน้ำ
 function tankIconURL(d){
   var dark=S.theme!=="white";
@@ -559,12 +559,12 @@ function tankIconURL(d){
   if(d.mini){ // ชิปจิ๋ว — ตอนซูมออกไกลมาก ทุกสถานี
     var mBg=(S.theme!=="white")?"#0a1526":"#ffffff",mNm=(S.theme!=="white")?"#e2eefc":"#0b1f33";
     var mv=S.param==="turb"?(d.turb!=null?Number(d.turb).toFixed(1):"-"):(d.frcOut!=null?d.frcOut.toFixed(2):"-");
-    var mm=icDim(96,26,24,22);
+    var mm=icDim(96,26,24,25);
     var msvg='<svg xmlns="http://www.w3.org/2000/svg" width="'+mm.w+'" height="'+mm.h+'" viewBox="0 0 96 26">'
-      +'<rect x="1.5" y="1.5" width="93" height="23" rx="11.5" fill="'+mBg+'" fill-opacity="0.95" stroke="'+col+'" stroke-width="1.6"/>'
-      +'<circle cx="13" cy="13" r="3.5" fill="'+col+'"/>'
-      +'<text x="21" y="17.5" font-family="monospace" font-size="11.5" font-weight="700" fill="'+mNm+'">'+d.code+'</text>'
-      +'<text x="91" y="17.5" text-anchor="end" font-family="monospace" font-size="11" font-weight="700" fill="'+lite+'">'+mv+'</text></svg>';
+      +'<rect x="1.5" y="1.5" width="93" height="23" rx="11.5" fill="'+mBg+'" fill-opacity="0.97" stroke="'+col+'" stroke-width="2"/>'
+      +'<circle cx="13" cy="13" r="4" fill="'+col+'"/>'
+      +'<text x="21.5" y="17.8" font-family="monospace" font-size="12.5" font-weight="700" fill="'+mNm+'">'+d.code+'</text>'
+      +'<text x="91" y="17.8" text-anchor="end" font-family="monospace" font-size="12" font-weight="700" fill="'+lite+'">'+mv+'</text></svg>';
     return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(msvg);
   }
   var sel=d.stationId===S.selectedId;
@@ -637,7 +637,7 @@ function tankIconURL(d){
     +'<polygon points="'+P(cx-hw,topY+dy)+' '+P(cx,topY+2*dy)+' '+P(cx+hw,topY+dy)+' '+P(cx,topY)+'" fill="'+(dark?"#12395c":"#c3daef")+'" fill-opacity="0.9" stroke="'+lite+'" stroke-width="1.1"/>'
     +(byp?'<line x1="'+(cx-hw-11)+'" y1="'+(topY+dy+hgt/2)+'" x2="'+(cx+hw+11)+'" y2="'+(topY+dy+hgt/2)+'" stroke="'+bypC+'" stroke-width="3" stroke-linecap="round" opacity="0.95"/><path d="M'+(cx+hw+4)+' '+(topY+dy+hgt/2-4)+' L'+(cx+hw+12)+' '+(topY+dy+hgt/2)+' L'+(cx+hw+4)+' '+(topY+dy+hgt/2+4)+'" fill="none" stroke="'+bypC+'" stroke-width="1.6"/>':'')
     +'<line x1="'+(cx+hw)+'" y1="'+(wf-dy)+'" x2="'+(cx+hw+6)+'" y2="'+(wf-dy)+'" stroke="'+lite+'" stroke-width="1.4"/>'
-    +'<text x="'+(cx+hw+9)+'" y="'+(wf-dy+4)+'" font-family="monospace" font-size="12.5" font-weight="700" fill="'+lite+'" stroke="'+halo+'" stroke-width="3" paint-order="stroke">'+(d.lvLive?"":"~")+lv+' m</text>'
+    +'<text x="'+(cx+hw+9)+'" y="'+(wf-dy+4)+'" font-family="monospace" font-size="12.5" font-weight="700" fill="'+lite+'" stroke="'+halo+'" stroke-width="3" paint-order="stroke">'+(d.lvLive?lv+" m":"- m")+'</text>'
     +simBand+'</svg>';
   return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
@@ -881,7 +881,7 @@ function buildLayers(){
   // LK กับ LK2 อยู่ติดกันจริง — ตำแหน่งไม่ขยับเด็ดขาด แก้ป้ายซ้อนด้วยการยุบป้าย LK2
   // เป็นชิปเล็กลอยเหนือการ์ด LK ตอน zoom ไกล (z<13.5) แล้วกางเป็นการ์ดเต็มเมื่อซูมเข้า
   var _zv=14;try{_zv=map.getZoom();}catch(e){}
-  var lk2Compact=_zv<13.5,miniAll=_zv<10.3; // z<9.4: ทุกสถานียุบเป็นชิปจิ๋ว ภาพรวมโล่งอ่านง่าย
+  var lk2Compact=_zv<13.5,miniAll=_zv<9.8; // เริ่มต้น z10.1 เห็นการ์ด+ถังครบ, ซูมออกอีกนิดค่อยยุบเป็นชิป // z<9.4: ทุกสถานียุบเป็นชิปจิ๋ว ภาพรวมโล่งอ่านง่าย
   arr=arr.map(function(d){
     if(!miniAll&&!(d.stationId==="LK2"&&lk2Compact))return d;
     return Object.assign({},d,{mini:miniAll,compact:!miniAll&&d.stationId==="LK2"&&lk2Compact});
@@ -963,9 +963,9 @@ function buildLayers(){
   L.push(new deck.IconLayer({id:"tank-icons",data:arr,pickable:true,billboard:true,
     getPosition:d=>d.coord,
     getIcon:function(d){var m=d.mini?icDim(96,26,24,22):d.compact?icDim(176,84,82,60):icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
-    getSize:function(d){return Math.round((d.mini?22:d.compact?60:102)*(S.uiScale||1));},sizeUnits:"pixels",
+    getSize:function(d){return Math.round((d.mini?25:d.compact?60:102)*(S.uiScale||1));},sizeUnits:"pixels",
     getPixelOffset:function(d){var us=S.uiScale||1;
-      if(d.mini)return d.stationId==="LK2"?[0,-Math.round(27*us)]:[0,0];
+      if(d.mini)return d.stationId==="LK2"?[0,-Math.round(31*us)]:[0,0];
       return d.compact?[Math.round(133*us),-Math.round(36*us)]:[0,0];},
     updateTriggers:{getIcon:[iconSig,S.uiScale],getSize:[S.uiScale,lk2Compact,miniAll],getPixelOffset:[S.uiScale,lk2Compact,miniAll]}}));
   // Hub สูบส่ง — ถังตกตะกอน (แบบ C)
@@ -1212,7 +1212,7 @@ function renderInfo(){
     '<div class="stat-row"><span class="stat-label">k อ้างอิง (ม.ค.-มี.ค. 69)</span><span class="stat-value mono" style="color:#fbbf24">'+(kHist?kHist.toFixed(3):"—")+' /day</span></div>'+
     '<div class="stat-row"><span class="stat-label">k สด (คำนวณขณะนี้)</span><span class="stat-value mono" style="color:'+(kLive>0?"#34d399":"#48596e")+'">'+(kLive>0?kLive.toFixed(3)+" /day":(s.bypass?"— (bypass)":(s.hasBooster?"— (booster)":"—")))+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">Tank Area</span><span class="stat-value mono">'+(s.area?s.area.toLocaleString():"—")+' m²</span></div>'+
-    '<div class="stat-row"><span class="stat-label">ระดับน้ำในถัง</span><span class="stat-value mono" style="color:#22d3ee">'+(s.level!=null?(s.lvLive?"":"~")+s.level.toFixed(2):"—")+' m'+(s.lvLive?' <span style="font-size:8px;color:#34d399;vertical-align:2px">●LIVE</span>':' <span style="font-size:8px;color:#8aa3bd;vertical-align:2px">ค่าสมมติ</span>')+'</span></div>'+
+    '<div class="stat-row"><span class="stat-label">ระดับน้ำในถัง</span><span class="stat-value mono" style="color:#22d3ee">'+(s.lvLive&&s.level!=null?s.level.toFixed(2)+' m <span style="font-size:8px;color:#34d399;vertical-align:2px">●LIVE</span>':'— <span style="font-size:8px;color:#8aa3bd;vertical-align:2px">ไม่มีข้อมูล</span>')+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">อัตราจ่ายปัจจุบัน</span><span class="stat-value mono" style="color:#38bdf8">'+(s.flowLive?Math.round(s.flowLive).toLocaleString():"—")+' m³/h</span></div>'+
     '<div class="stat-row"><span class="stat-label">น้ำเข้าถัง (Qin)</span><span class="stat-value mono" style="color:'+(s.bypass?"#fbbf24":"#7dd3fc")+'">'+(s.qin!=null?Math.round(s.qin).toLocaleString():"—")+' m³/h</span></div>'+
     '<div class="stat-row"><span class="stat-label">ปริมาตรน้ำ</span><span class="stat-value mono" style="color:#60a5fa">'+(s.level!=null&&s.area?Math.round(s.level*s.area).toLocaleString():"—")+' m³</span></div>';
@@ -1498,7 +1498,7 @@ function renderDetail(id){
     :((s.fis!=null&&s.fis>0)?s.fis:((s.flowLive!=null&&s.flowLive>0)?s.flowLive:null));
   var fl=s.flowLive!=null?Math.round(s.flowLive).toLocaleString():"—";
   var vol=(s.level!=null&&s.area)?Math.round(s.level*s.area).toLocaleString():"—";
-  var lv=s.level!=null?s.level.toFixed(2):"—";
+  var lv=(s.lvLive&&s.level!=null)?s.level.toFixed(2):"—";
   var outC=s.frcOut==null?"#8fb3cc":(s.frcOut>=0.8?"#22d3ee":(s.frcOut>=0.5?"#fbbf24":"#f87171"));
   var byp=!!s.bypass,clOn=((s.tank&&s.tank.dose>0)||!!s.dosing);
   var mono='font-family="JetBrains Mono,monospace"';
