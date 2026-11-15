@@ -170,7 +170,7 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
   <div class="ld-meta"><span class="ld-status" id="ldStatus">กำลังเริ่มระบบ...</span><span class="ld-pct" id="ldPct">0%</span></div>
 </div></div>
 <div id="map"></div>
-<div id="errToast" style="display:none;position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(127,29,29,0.94);border:1px solid #f87171;color:#fecaca;font-size:11px;padding:7px 15px;border-radius:8px;max-width:84%;backdrop-filter:blur(6px);text-align:center"></div>
+<div id="errToast" style="display:none;position:fixed;top:132px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(127,29,29,0.94);border:1px solid #f87171;color:#fecaca;font-size:11px;padding:7px 15px;border-radius:8px;max-width:84%;backdrop-filter:blur(6px);text-align:center"></div>
 
 <div class="header">
   <div><h1>ระบบตรวจสอบคุณภาพน้ำระบบจ่ายคลอรีนปลายสาย</h1><div class="sub">FRC Digital Twin • MWA Chlorine Decay Monitoring</div></div>
@@ -182,6 +182,7 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
     <div style="display:flex;gap:4px;background:rgba(7,13,26,0.82);border:1px solid rgba(34,211,238,0.18);border-radius:20px;padding:3px">
       <button id="btn-dark" class="theme-btn active" onclick="setTheme('dark')">🌑 มืด</button>
       <button id="btn-white" class="theme-btn" onclick="setTheme('white')">⬜ ขาว</button>
+      <button id="btn-sat" class="theme-btn" onclick="setTheme('sat')">ดาวเทียม</button>
         <button class="theme-btn" onclick="uiZoom(-0.15)" title="ย่อป้ายสถานี">ก−</button>
         <button class="theme-btn" onclick="uiZoom(0.15)" title="ขยายป้ายสถานี">ก+</button>
     </div>
@@ -193,7 +194,10 @@ body{font-family:'IBM Plex Sans Thai',sans-serif;background:#04070f;color:#c8d6e
   <div style="text-align:right"><div class="clock" id="clock">--:--:--</div><div class="clock-date" id="clockDate"></div></div>
 </div>
 
-<div class="rank-panel glass"><div class="rank-title">Decay Rate Ranking (k/day)</div><div id="rankList"></div><div style="font-size:8px;color:#48596e;margin-top:7px">ข้อมูลจริง ม.ค.-มี.ค. 69 · สมมติระดับ 4.0 ม. · SR ข้อมูลน้อย</div></div>
+<div class="rank-panel glass"><div class="rank-title" style="display:flex;justify-content:space-between;align-items:center;gap:6px">Decay Rate (k/day)<span style="display:flex;gap:3px">
+  <button id="rk-hist" onclick="setRankMode('hist')" style="background:rgba(34,211,238,0.2);border:1px solid rgba(34,211,238,0.5);color:#67e8f9;border-radius:8px;padding:1px 8px;font-size:8.5px;cursor:pointer;font-family:inherit;font-weight:700">อ้างอิง</button>
+  <button id="rk-live" onclick="setRankMode('live')" style="background:transparent;border:1px solid rgba(100,116,139,0.4);color:#8aa3bd;border-radius:8px;padding:1px 8px;font-size:8.5px;cursor:pointer;font-family:inherit;font-weight:700">สด</button>
+</span></div><div id="rankList"></div><div style="font-size:8px;color:#48596e;margin-top:7px" id="rankNote">ข้อมูลจริง ม.ค.-มี.ค. 69 · สมมติระดับ 4.0 ม. · SR ข้อมูลน้อย</div></div>
 
 <div class="info-panel glass" id="infoPanel"></div>
 
@@ -365,7 +369,7 @@ function _t0(r){
 const TRIPS=ROUTES2.map(function(r){
   var p=densify(r.pts,8),t0=_t0(r),ts=[t0],acc=t0;
   for(var i=1;i<p.length;i++){acc+=segDist(p[i-1],p[i])*SPEED;ts.push(acc);}
-  return{path:p,timestamps:ts,g:r.g,color:GROUP_COLOR[r.g],kind:r.kind||"main"};
+  return{path:p,timestamps:ts,g:r.g,color:GROUP_COLOR[r.g],kind:r.kind||"main",id:r.id};
 });
 const LOOP=Math.max.apply(null,TRIPS.map(function(t){return t.timestamps[t.timestamps.length-1];}))+140;
 let animTime=0;
@@ -373,6 +377,12 @@ let animTime=0;
 window.__S={stations:{},hist:{},detailOpen:null,selectedId:null,simLevel:4.0,simFlow:16000,threshold:0.8,layersOn:{pipe:true,area:true},theme:"dark",dose:{target:1.00,factor:0.89,sg:1.20,frcin:null,k:null,t:null,q:null}};
 const S=window.__S;
 try{S.uiScale=parseFloat(localStorage.getItem("frcUiScale"))||1;}catch(e){S.uiScale=1;}
+try{var _th=localStorage.getItem("frcTheme");if(_th==="white"||_th==="sat")S.theme=_th;}catch(e){}
+document.addEventListener("DOMContentLoaded",function(){
+  ["dark","white","sat"].forEach(function(x){
+    var b=document.getElementById("btn-"+x);if(b)b.classList.toggle("active",S.theme===x);
+  });
+});
 // LK2: ยังไม่มี API — ค่าสนามชั่วคราว 11/09/69 (ลบทิ้งเมื่อ API มา)
 function seedLK2(){
   var m=META["LK2"];
@@ -391,7 +401,7 @@ seedLK2();
 setInterval(seedLK2,15000); // กันโดนรอบโหลดล้าง/ข้าม
 
 function frcColor(fo,booster){
-  var dark=S.theme==="dark";
+  var dark=S.theme!=="white";
   if(booster)return dark?[167,139,250]:[124,58,237];
   if(fo>=0.8)return dark?[34,211,238]:[2,132,199];
   if(fo>=0.5)return dark?[251,191,36]:[202,138,4];
@@ -400,7 +410,7 @@ function frcColor(fo,booster){
 }
 // ===== พารามิเตอร์แสดงผล: frc | turb (เกณฑ์ความขุ่น กปน. < 4 NTU) =====
 function turbColor(t){
-  var dark=S.theme==="dark";
+  var dark=S.theme!=="white";
   if(t==null)return dark?[100,116,139]:[71,85,105];
   if(t>4)return dark?[248,113,113]:[220,38,38];
   if(t>1)return dark?[251,191,36]:[202,138,4];
@@ -444,14 +454,18 @@ window.toggleParam=function(){setParam(S.param==="turb"?"frc":"turb");};
 })();
 
 function mkMapStyle(theme){
-  // OpenFreeMap vector styles — ฟรีถาวร ไม่มี key (dark = สายเดียวกับ dark-matter เดิม)
+  // dark/white: OpenFreeMap vector (ฟรี ไม่มี key) · sat: Esri World Imagery raster (ฟรี ไม่มี key)
+  if(theme==="sat")return{version:8,sources:{esri:{type:"raster",
+    tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+    tileSize:256,attribution:"Esri, Maxar, Earthstar Geographics"}},
+    layers:[{id:"esri-img",type:"raster",source:"esri"}]};
   return theme==="dark"?"https://tiles.openfreemap.org/styles/dark":"https://tiles.openfreemap.org/styles/positron";
 }
 // ลดความรกของ basemap: ซ่อนป้าย POI/หมู่บ้าน (BAN ...) + หรี่ป้ายที่เหลือ — คืนลุคเรียบแบบ dark-matter เดิม
 function tuneBasemap(){
   try{
     var st=map.getStyle();if(!st||!st.layers)return;
-    var dark=S.theme==="dark";
+    var dark=S.theme!=="white";
     st.layers.forEach(function(l){
       if(l.type!=="symbol")return;
       var key=(l["source-layer"]||"")+" "+l.id;
@@ -463,8 +477,8 @@ function tuneBasemap(){
 }
 function addOutsideMask(){
   try{
-    var dark=S.theme==="dark";
-    var world=[[100.0,13.2],[101.3,13.2],[101.3,14.3],[100.0,14.3],[100.0,13.2]];
+    var dark=S.theme!=="white";
+    var world=[[99.0,12.5],[102.5,12.5],[102.5,15.0],[99.0,15.0],[99.0,12.5]];
     // basemap-dim: หรี่ basemap ทั้งแผนที่ (ป้ายชื่อ/ถนน) ให้จางลง — วางก่อน mask และก่อนตึก 3D
     if(!map.getSource("dim-src"))map.addSource("dim-src",{type:"geojson",data:{type:"Feature",geometry:{type:"Polygon",coordinates:[world]}}});
     if(!map.getLayer("basemap-dim"))map.addLayer({id:"basemap-dim",type:"fill",source:"dim-src",
@@ -481,7 +495,7 @@ function addBuildings3D(){
   addOutsideMask();
   try{
     if(map.getLayer("3d-b"))return;
-    var dark=S.theme==="dark";
+    var dark=S.theme!=="white";
     if(!map.getSource("omt"))map.addSource("omt",{type:"vector",url:"https://tiles.openfreemap.org/planet"});
     var bld=dark?
       ["interpolate",["linear"],["coalesce",["get","render_height"],10],0,"#1a2942",50,"#2a4560",120,"#356080"]:
@@ -490,15 +504,16 @@ function addBuildings3D(){
       paint:{"fill-extrusion-color":bld,
         "fill-extrusion-height":["coalesce",["get","render_height"],10],
         "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
-        "fill-extrusion-opacity":S.theme==="dark"?0.8:0.92}});
+        "fill-extrusion-opacity":S.theme!=="white"?0.8:0.92}});
   }catch(e){}
 }
 
 const map=new maplibregl.Map({
-  container:"map",style:mkMapStyle("dark"),
+  container:"map",style:mkMapStyle(S.theme),
   center:[100.55,13.75],zoom:8.8,pitch:0,bearing:0,maxPitch:70,antialias:true,
-  maxBounds:[[100.20,13.40],[101.02,14.10]],maxTileCacheSize:200
+  minZoom:8.2,maxTileCacheSize:200
 });
+window._map=map; // สำหรับ debug/ทดสอบ
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"bottom-right");
 map.on("style.load",function(){addBuildings3D();});
 map.on("idle",function(){addBuildings3D();});
@@ -508,8 +523,10 @@ map.on("zoom",function(){if(_zt)return;_zt=setTimeout(function(){_zt=null;try{bu
 window.setTheme=function(t){
   map.__tuned=false;
   S.theme=t;
-  document.getElementById("btn-dark").classList.toggle("active",t==="dark");
-  document.getElementById("btn-white").classList.toggle("active",t==="white");
+  try{localStorage.setItem("frcTheme",t);}catch(e){}
+  ["dark","white","sat"].forEach(function(x){
+    var b=document.getElementById("btn-"+x);if(b)b.classList.toggle("active",t===x);
+  });
   map.setStyle(mkMapStyle(t));
 };
 
@@ -536,9 +553,20 @@ window.addEventListener("resize",function(){DPR=Math.max(1,Math.min(window.devic
 function icDim(vw,vh,anchorV,disp){var sc=disp*DPR*(S.uiScale||1)/vh;return{w:Math.round(vw*sc),h:Math.round(vh*sc),a:Math.round(anchorV*sc)};}
 // การ์ดข้อมูลกะทัดรัด + ถังกว้างเตี้ยขนาดเท่ากันทุกสถานี ฐานปักพื้น + ป้ายระดับที่ผิวน้ำ
 function tankIconURL(d){
-  var dark=S.theme==="dark";
+  var dark=S.theme!=="white";
   var c=paramColor(d),col=hexOf(c);
   var lite=hexOf(c.map(function(v){return Math.min(v+85,255);}));
+  if(d.mini){ // ชิปจิ๋ว — ตอนซูมออกไกลมาก ทุกสถานี
+    var mBg=(S.theme!=="white")?"#0a1526":"#ffffff",mNm=(S.theme!=="white")?"#e2eefc":"#0b1f33";
+    var mv=S.param==="turb"?(d.turb!=null?Number(d.turb).toFixed(1):"-"):(d.frcOut!=null?d.frcOut.toFixed(2):"-");
+    var mm=icDim(96,26,24,22);
+    var msvg='<svg xmlns="http://www.w3.org/2000/svg" width="'+mm.w+'" height="'+mm.h+'" viewBox="0 0 96 26">'
+      +'<rect x="1.5" y="1.5" width="93" height="23" rx="11.5" fill="'+mBg+'" fill-opacity="0.95" stroke="'+col+'" stroke-width="1.6"/>'
+      +'<circle cx="13" cy="13" r="3.5" fill="'+col+'"/>'
+      +'<text x="21" y="17.5" font-family="monospace" font-size="11.5" font-weight="700" fill="'+mNm+'">'+d.code+'</text>'
+      +'<text x="91" y="17.5" text-anchor="end" font-family="monospace" font-size="11" font-weight="700" fill="'+lite+'">'+mv+'</text></svg>';
+    return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(msvg);
+  }
   var sel=d.stationId===S.selectedId;
   var byp=!!d.bypass;
   var bypC=dark?"#fbbf24":"#b45309";
@@ -617,7 +645,7 @@ function tankIconURL(d){
 
 // ไอคอนถังตกตะกอน (แบบ C) สีฟ้า ทรงสูง สำหรับ MTR/TR1/TR2/TR3 + ค่า FRC ขาออกสด
 function hubIconURL(d){
-  var dark=S.theme==="dark";
+  var dark=S.theme!=="white";
   var col=dark?"#38bdf8":"#0284c7";
   var lite=dark?"#7dd3fc":"#0369a1";
   var halo=dark?"#04070f":"#ffffff";
@@ -647,7 +675,7 @@ function hubIconURL(d){
 
 // ป้ายโรงงานผลิตน้ำ — การ์ดกระจกสไตล์เดียวกับสถานี
 function plantIconURL(d){
-  var dark=S.theme==="dark";
+  var dark=S.theme!=="white";
   var col=dark?"#38bdf8":"#0284c7";
   var lite=dark?"#7dd3fc":"#0369a1";
   var cardBg=dark?"#0a1526":"#ffffff";
@@ -852,11 +880,14 @@ function buildLayers(){
   if(!arr.length)return;
   // LK กับ LK2 อยู่ติดกันจริง — ตำแหน่งไม่ขยับเด็ดขาด แก้ป้ายซ้อนด้วยการยุบป้าย LK2
   // เป็นชิปเล็กลอยเหนือการ์ด LK ตอน zoom ไกล (z<13.5) แล้วกางเป็นการ์ดเต็มเมื่อซูมเข้า
-  var lk2Compact=false;
-  try{lk2Compact=map.getZoom()<13.5;}catch(e){}
-  arr=arr.map(function(d){return d.stationId==="LK2"?Object.assign({},d,{compact:lk2Compact}):d;});
+  var _zv=14;try{_zv=map.getZoom();}catch(e){}
+  var lk2Compact=_zv<13.5,miniAll=_zv<9.4; // z<9.4: ทุกสถานียุบเป็นชิปจิ๋ว ภาพรวมโล่งอ่านง่าย
+  arr=arr.map(function(d){
+    if(!miniAll&&!(d.stationId==="LK2"&&lk2Compact))return d;
+    return Object.assign({},d,{mini:miniAll,compact:!miniAll&&d.stationId==="LK2"&&lk2Compact});
+  });
   var pulse=(Date.now()/1400)%1;
-  var dark=S.theme==="dark";
+  var dark=S.theme!=="white";
   var L=[];
   if(S.layersOn.area){
     // เขตสาขา 18 เขต (จางๆ)
@@ -873,6 +904,13 @@ function buildLayers(){
   if(S.layersOn.pipe){
     var mains=TRIPS.filter(function(t){return t.kind!=="spur";});
     var sps=TRIPS.filter(function(t){return t.kind==="spur";});
+    // สถานีตามรหัส + ลายเซ็น FRC ของแขนง (น้ำเข้าสถานีย้อมสีตามค่าคลอรีนจริง)
+    var stByCode={};arr.forEach(function(s){stByCode[s.code]=s;});
+    var spurCode=function(t){return String(t.id||"").replace(/^sp-/,"").replace(/\d+$/,"");};
+    var spurFrcSig=sps.map(function(t){var st=stByCode[spurCode(t)];return spurCode(t)+":"+(st&&st.frcOut!=null?st.frcOut:"-");}).join("|");
+    // แสงเรืองนีออนใต้อุโมงค์
+    L.push(new deck.PathLayer({id:"tunnel-neon",data:mains,getPath:d=>d.path,
+      getColor:d=>d.color.concat([dark?36:22]),getWidth:760,widthMinPixels:14,capRounded:true,jointRounded:true}));
     // ตัวอุโมงค์ (casing หนา เข้ม)
     L.push(new deck.PathLayer({id:"tunnel-casing",data:mains,getPath:d=>d.path,
       getColor:d=>d.color.concat([dark?160:200]),getWidth:300,widthMinPixels:7,capRounded:true,jointRounded:true}));
@@ -888,9 +926,14 @@ function buildLayers(){
     L.push(new deck.PathLayer({id:"spur-casing",data:sps,getPath:d=>d.path,
       getColor:d=>d.color.concat([dark?150:190]),getWidth:120,widthMinPixels:3,capRounded:true}));
     L.push(new deck.TripsLayer({id:"spur-water",data:sps,getPath:d=>d.path,getTimestamps:d=>d.timestamps,
-      getColor:d=>dark?[Math.min(d.color[0]+85,255),Math.min(d.color[1]+85,255),Math.min(d.color[2]+85,255)]:d.color,
-      getWidth:60,widthMinPixels:1.8,
-      trailLength:130,currentTime:animTime,capRounded:true,fadeTrail:true,opacity:0.98}));
+      getColor:function(d){
+        var st=stByCode[spurCode(d)];
+        var base=(st&&st.frcOut!=null&&!st.hasBooster)?frcColor(st.frcOut,false):d.color;
+        return dark?[Math.min(base[0]+85,255),Math.min(base[1]+85,255),Math.min(base[2]+85,255)]:base;
+      },
+      getWidth:72,widthMinPixels:2.2,
+      trailLength:130,currentTime:animTime,capRounded:true,fadeTrail:true,opacity:0.98,
+      updateTriggers:{getColor:[spurFrcSig,S.theme]}}));
   }
   var phz=function(d){ // เฟสเฉพาะสถานี (กระจายจังหวะ ไม่เต้นพร้อมกัน)
     var h=0,s=String(d.stationId||"");for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%97;
@@ -916,13 +959,15 @@ function buildLayers(){
       stroked:true,lineWidthMinPixels:3,filled:true,
       updateTriggers:{getRadius:[ap],getFillColor:[ap,alSig],getLineColor:[ap,alSig]}}));
   }
-  var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,s.turb,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId+"|"+DPR+"|"+S.param+"|"+(lk2Compact?1:0);
+  var iconSig=arr.map(function(s){return [s.frcIn,s.frcOut,s.turb,(s.level||0).toFixed(2),s.bypass?1:0].join(",");}).join("|")+"|"+S.theme+"|"+S.selectedId+"|"+DPR+"|"+S.param+"|"+(lk2Compact?1:0)+"|"+(miniAll?1:0);
   L.push(new deck.IconLayer({id:"tank-icons",data:arr,pickable:true,billboard:true,
     getPosition:d=>d.coord,
-    getIcon:function(d){var m=d.compact?icDim(176,84,82,60):icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
-    getSize:function(d){return Math.round((d.compact?60:102)*(S.uiScale||1));},sizeUnits:"pixels",
-    getPixelOffset:function(d){var us=S.uiScale||1;return d.compact?[Math.round(133*us),-Math.round(36*us)]:[0,0];},
-    updateTriggers:{getIcon:[iconSig,S.uiScale],getSize:[S.uiScale,lk2Compact],getPixelOffset:[S.uiScale,lk2Compact]}}));
+    getIcon:function(d){var m=d.mini?icDim(96,26,24,22):d.compact?icDim(176,84,82,60):icDim(176,142,132,102);return {url:tankIconURL(d),width:m.w,height:m.h,anchorY:m.a};},
+    getSize:function(d){return Math.round((d.mini?22:d.compact?60:102)*(S.uiScale||1));},sizeUnits:"pixels",
+    getPixelOffset:function(d){var us=S.uiScale||1;
+      if(d.mini)return d.stationId==="LK2"?[0,-Math.round(27*us)]:[0,0];
+      return d.compact?[Math.round(133*us),-Math.round(36*us)]:[0,0];},
+    updateTriggers:{getIcon:[iconSig,S.uiScale],getSize:[S.uiScale,lk2Compact,miniAll],getPixelOffset:[S.uiScale,lk2Compact,miniAll]}}));
   // Hub สูบส่ง — ถังตกตะกอน (แบบ C)
   L.push(new deck.IconLayer({id:"hubs",data:HUBS,pickable:true,billboard:true,
     getPosition:d=>d.coord,getPixelOffset:d=>d.off||[0,0],
@@ -944,8 +989,11 @@ window.uiZoom=function(dd){
 };
 
 let lastFrame=0,animErrShown=false;
+document.addEventListener("visibilitychange",function(){
+  if(!document.hidden){lastFrame=0;try{buildLayers();}catch(e){}}
+});
 function animate(ts){
-  if(ts-lastFrame>33){
+  if(!document.hidden&&ts-lastFrame>33){
     animTime=(animTime+3.0)%LOOP;
     try{buildLayers();}catch(e){if(!animErrShown){animErrShown=true;showErr("layers: "+e.message);}}
     lastFrame=ts;
@@ -955,7 +1003,23 @@ function animate(ts){
 
 function setBadge(t){var el=document.querySelector(".badge span");if(el)el.textContent=t;}
 function fT(url,ms){return Promise.race([fetch(url),new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"));},ms||6000);})]);}
-function pushHist(id,v){var _h=(S.hist[id]=S.hist[id]||[]);if(v!=null){_h.push(v);if(_h.length>16)_h.shift();}}
+function pushHist(id,v,vin){ // เก็บเป็น {t,o,i} สูงสุด 360 จุด (~6 ชม. ที่รอบอ่าน 1 นาที)
+  var _h=(S.hist[id]=S.hist[id]||[]);
+  if(v!=null){_h.push({t:Date.now(),o:v,i:(vin!=null&&vin>0)?vin:null});if(_h.length>360)_h.shift();}
+}
+function sensorFlags(id){ // ตรวจสุขภาพข้อมูลเซ็นเซอร์ — ไม่ยุ่งกับ alarm เด็ดขาด แค่ติดป้าย
+  var h=S.hist[id]||[],f=[];
+  if(h.length>=12){
+    var tail=h.slice(-12),span=tail[tail.length-1].t-tail[0].t;
+    var frozen=tail.every(function(p){return Math.abs(p.o-tail[0].o)<0.003;});
+    if(frozen&&span>=10*60*1000)f.push("ค่า FRC นิ่งสนิท ~"+Math.round(span/60000)+" นาที — เซ็นเซอร์อาจค้าง/สายสัญญาณขาด");
+  }
+  if(h.length>=2){
+    var d=h[h.length-1].o-h[h.length-2].o;
+    if(Math.abs(d)>0.5)f.push("ค่ากระโดด "+(d>0?"+":"")+d.toFixed(2)+" mg/L ในรอบอ่านเดียว — ตรวจสอบเซ็นเซอร์/ฟองอากาศ");
+  }
+  return f;
+}
 function loadMock(){
   IDS.forEach(function(id){var mk=MOCK[id],m=META[id];
     var kt=(!mk.bypass&&mk.frcIn&&mk.frcOut&&mk.frcOut<mk.frcIn)?-Math.log(mk.frcOut/mk.frcIn):null;
@@ -1000,7 +1064,7 @@ function loadLive(){
     // ระดับน้ำจริง: เปลี่ยน sc.LEVEL เป็นชื่อ field จาก SCADA เมื่อทราบ (รอเชื่อม API)
     var lvl=sc.LEVEL!=null?sc.LEVEL:(sc.Level!=null?sc.Level:4.0);
     S.stations[id]=Object.assign({},m,{stationId:id,fis:sc.FLOW_INLET_STATION,frcIn:frcIn,frcOut:frcOut,turb:sc.Turbidity,tempOut:sc.TEMP_OUTLET/100,ph:sc.PH,dt:sc.LogDateTime,kt:kt,t:(lvl*m.area)/m.flow,kHist:m.k,bypass:bypass,dosing:dosing,p1:sc.PUMP1_STS,p2:sc.PUMP2_STS,conduct:sc.Conduct,hasBooster:dosing&&!bypass,level:lvl});
-    pushHist(id,frcOut);ok++;
+    pushHist(id,frcOut,frcIn);ok++;
   }).catch(function(){}).then(function(){lpStation();});})).then(function(){
     if(ok===0){
       return loadPublic().catch(function(){
@@ -1061,13 +1125,34 @@ window.toggleLayer=function(t){S.layersOn[t]=!S.layersOn[t];document.getElementB
 window.resetView=function(){map.flyTo({center:[100.565,13.725],zoom:10.1,pitch:52,bearing:-14,duration:1400});};
 window.topView=function(){map.flyTo({center:[100.56,13.74],zoom:10.1,pitch:0,bearing:0,duration:1200});};
 
+function kLiveOf(x){ // k สด (ต่อวัน) จาก FRC เข้า/ออก + retention ปัจจุบัน — สมมติ steady state
+  return (x&&x.kt&&x.t>0)?x.kt*24/x.t:null;
+}
+window.setRankMode=function(m){
+  S.rankMode=m;
+  var h=document.getElementById("rk-hist"),l=document.getElementById("rk-live");
+  var on="background:rgba(34,211,238,0.2);border:1px solid rgba(34,211,238,0.5);color:#67e8f9",
+      off="background:transparent;border:1px solid rgba(100,116,139,0.4);color:#8aa3bd",
+      base=";border-radius:8px;padding:1px 8px;font-size:8.5px;cursor:pointer;font-family:inherit;font-weight:700";
+  if(h)h.style.cssText=(m==="hist"?on:off)+base;
+  if(l)l.style.cssText=(m==="live"?on:off)+base;
+  var n=document.getElementById("rankNote");
+  if(n)n.textContent=m==="live"
+    ?"คำนวณสดจาก FRC เข้า/ออก + retention ขณะนี้ (ไม่รวม bypass/booster)"
+    :"ข้อมูลจริง ม.ค.-มี.ค. 69 · สมมติระดับ 4.0 ม. · SR ข้อมูลน้อย";
+  renderRanking();
+};
 function renderRanking(){
   try{checkAlarms();}catch(e){}
-  var r=Object.values(S.stations).filter(x=>x.kHist>0).sort((a,b)=>b.kHist-a.kHist);
-  document.getElementById("rankList").innerHTML=r.map(function(x,i){
-    var kv=x.kHist,col=kv>1.0?"#f87171":kv>0.4?"#fbbf24":"#34d399";
+  var live=S.rankMode==="live";
+  var r=Object.values(S.stations)
+    .map(function(x){return{x:x,k:live?kLiveOf(x):x.kHist};})
+    .filter(function(o){return o.k>0;})
+    .sort(function(a,b){return b.k-a.k;});
+  document.getElementById("rankList").innerHTML=r.map(function(o,i){
+    var x=o.x,kv=o.k,col=kv>1.0?"#f87171":kv>0.4?"#fbbf24":"#34d399";
     return '<div class="rank-item" onclick="selectStation(\''+x.stationId+'\')"><span style="width:12px;text-align:right;color:'+(i===0?"#f87171":"#48596e")+';font-weight:700">'+(i+1)+'</span><span class="rank-code">'+x.code+'</span><div class="rank-bar"><div class="rank-bar-f" style="width:'+Math.min(kv/2.8*100,100)+'%;background:'+col+'"></div></div><span class="rank-val mono" style="color:'+col+'">'+kv.toFixed(2)+'</span></div>';
-  }).join("");
+  }).join("")||'<div style="font-size:10px;color:#48596e;padding:6px 0">ยังไม่มีข้อมูลพอคำนวณ</div>';
 }
 
 window.selectStation=function(id){
@@ -1080,10 +1165,36 @@ window.selectStation=function(id){
   renderInfo();
 };
 
+function sparkSVG(id){
+  var h=(S.hist[id]||[]).filter(function(p){return p&&p.o!=null;});
+  if(h.length<3)return"";
+  var W=252,H=56,P=5;
+  var t0=h[0].t,t1=h[h.length-1].t;
+  var vs=h.map(function(p){return p.o;}),mn=Math.min.apply(null,vs),mx=Math.max.apply(null,vs);
+  if(mx-mn<0.1){var mid=(mx+mn)/2;mn=mid-0.05;mx=mid+0.05;}
+  var X=function(t){return P+(W-2*P)*(t1===t0?0.5:(t-t0)/(t1-t0));};
+  var Y=function(v){return H-P-(H-2*P)*((v-mn)/(mx-mn));};
+  var pts=h.map(function(p){return X(p.t).toFixed(1)+","+Y(p.o).toFixed(1);}).join(" ");
+  var thY=(S.threshold>=mn&&S.threshold<=mx)?Y(S.threshold):null;
+  var ins=h.filter(function(p){return p.i!=null;});
+  var ptsIn=ins.length>2?ins.map(function(p){return X(p.t).toFixed(1)+","+Y(Math.max(mn,Math.min(mx,p.i))).toFixed(1);}).join(" "):null;
+  var mins=(t1-t0)/60000;
+  var dur=mins>=90?(mins/60).toFixed(1)+" ชม.":Math.max(1,Math.round(mins))+" นาที";
+  return '<div class="section-t">📈 แนวโน้ม FRC — '+dur+'ที่ผ่านมา <span style="font-weight:400;color:#48596e;font-size:9px">(ตั้งแต่เปิดหน้านี้ · '+h.length+' จุด)</span></div>'
+    +'<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="background:rgba(10,20,36,0.6);border-radius:8px;border:1px solid rgba(34,211,238,0.15);display:block">'
+    +(thY!=null?'<line x1="0" y1="'+thY.toFixed(1)+'" x2="'+W+'" y2="'+thY.toFixed(1)+'" stroke="#f59e0b" stroke-width="0.8" stroke-dasharray="3 3" opacity="0.7"/>':'')
+    +(ptsIn?'<polyline points="'+ptsIn+'" fill="none" stroke="#67e8f9" stroke-width="1" opacity="0.45"/>':'')
+    +'<polyline points="'+pts+'" fill="none" stroke="#4ade80" stroke-width="1.6"/>'
+    +'<circle cx="'+X(t1).toFixed(1)+'" cy="'+Y(vs[vs.length-1]).toFixed(1)+'" r="2.2" fill="#4ade80"/>'
+    +'<text x="4" y="10" font-size="7.5" fill="#8aa3bd" font-family="monospace">'+mx.toFixed(2)+'</text>'
+    +'<text x="4" y="'+(H-4)+'" font-size="7.5" fill="#8aa3bd" font-family="monospace">'+mn.toFixed(2)+'</text></svg>'
+    +(ptsIn?'<div style="font-size:9px;color:#48596e;margin:3px 0 0">— เขียว: FRC ออก · ฟ้าจาง: FRC เข้า · เส้นประ: เกณฑ์</div>':'');
+}
 function renderInfo(){
   var s=S.stations[S.selectedId]||META[S.selectedId];
   var panel=document.getElementById("infoPanel");panel.classList.add("show");
-  var kd=s.kHist,canCalc=kd&&kd>0;
+  var kHist=s.kHist,kLive=kLiveOf(s);
+  var kd=(S.liveK&&kLive>0)?kLive:kHist,canCalc=kd&&kd>0;
   var srcName={MTR:"สูบส่งมหาสวัสดิ์ (MTR)",TR1:"สูบส่งบางเขน 1 (TR1)",TR2:"สูบส่งบางเขน 2 (TR2)",TR3:"สูบส่งบางเขน 3 (TR3)"}[s.src]||s.src||"—";
   var html='<div class="close" onclick="closeInfo()">✕</div>'+(s.sim?'<div style="background:rgba(180,83,9,0.25);border:1px solid rgba(251,146,60,0.6);color:#fdba74;border-radius:10px;padding:7px 10px;margin-bottom:8px;font-size:12.5px;font-weight:800;text-align:center">⚠ ค่าจำลอง — ยังไม่มีการเชื่อมต่อระบบกับ LK2</div>':'')+'<div class="code">'+s.code+'</div><div class="name">'+s.name+' · รับน้ำจาก '+srcName+' &nbsp;<span class="open-st-btn" style="color:#67e8f9;cursor:pointer;font-size:10.5px;border:1px solid rgba(34,211,238,0.35);border-radius:8px;padding:1px 8px" onclick="openDetail(\''+S.selectedId+'\')">เปิดหน้าสถานี ⤢</span></div>'+
     '<div class="stat-row"><span class="stat-label">เติมคลอรีนเสริม (จาก FRC)</span><span class="stat-value mono" style="color:'+(s.dosing?"#a78bfa":"#7d93ab")+'">'+(s.dosing?"มี (Booster)":"ไม่มี")+'</span></div>'+
@@ -1093,12 +1204,16 @@ function renderInfo(){
     '<div class="stat-row"><span class="stat-label">FRC Outlet</span><span class="stat-value mono" style="color:'+(s.frcOut>=0.8?"#34d399":"#f87171")+'">'+(s.frcOut!=null?s.frcOut.toFixed(2):"—")+' mg/L</span></div>'+
     '<div class="stat-row"><span class="stat-label">Turbidity</span><span class="stat-value mono" style="color:#60a5fa">'+(s.turb!=null?s.turb.toFixed(2):"—")+' NTU</span></div>'+
     '<div class="stat-row"><span class="stat-label">Temp</span><span class="stat-value mono" style="color:#fbbf24">'+(s.tempOut!=null?s.tempOut.toFixed(1):"—")+' °C</span></div>'+
-    '<div class="stat-row"><span class="stat-label">k (historical)</span><span class="stat-value mono" style="color:#fbbf24">'+(kd?kd.toFixed(3):"—")+' /day</span></div>'+
+    '<div class="stat-row"><span class="stat-label">k อ้างอิง (ม.ค.-มี.ค. 69)</span><span class="stat-value mono" style="color:#fbbf24">'+(kHist?kHist.toFixed(3):"—")+' /day</span></div>'+
+    '<div class="stat-row"><span class="stat-label">k สด (คำนวณขณะนี้)</span><span class="stat-value mono" style="color:'+(kLive>0?"#34d399":"#48596e")+'">'+(kLive>0?kLive.toFixed(3)+" /day":(s.bypass?"— (bypass)":(s.hasBooster?"— (booster)":"—")))+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">Tank Area</span><span class="stat-value mono">'+(s.area?s.area.toLocaleString():"—")+' m²</span></div>'+
     '<div class="stat-row"><span class="stat-label">ระดับน้ำในถัง</span><span class="stat-value mono" style="color:#22d3ee">'+(s.level!=null?s.level.toFixed(2):"—")+' m'+(s.lvLive?' <span style="font-size:8px;color:#34d399;vertical-align:2px">●LIVE</span>':'')+'</span></div>'+
     '<div class="stat-row"><span class="stat-label">อัตราจ่ายปัจจุบัน</span><span class="stat-value mono" style="color:#38bdf8">'+(s.flowLive?Math.round(s.flowLive).toLocaleString():"—")+' m³/h</span></div>'+
     '<div class="stat-row"><span class="stat-label">น้ำเข้าถัง (Qin)</span><span class="stat-value mono" style="color:'+(s.bypass?"#fbbf24":"#7dd3fc")+'">'+(s.qin!=null?Math.round(s.qin).toLocaleString():"—")+' m³/h</span></div>'+
     '<div class="stat-row"><span class="stat-label">ปริมาตรน้ำ</span><span class="stat-value mono" style="color:#60a5fa">'+(s.level!=null&&s.area?Math.round(s.level*s.area).toLocaleString():"—")+' m³</span></div>';
+  var _fl=sensorFlags(S.selectedId)||[];
+  if(_fl.length)html+='<div style="background:rgba(180,83,9,0.18);border:1px solid rgba(251,191,36,0.5);color:#fde68a;border-radius:10px;padding:7px 10px;font-size:11px;margin-top:8px;line-height:1.5">'+_fl.map(function(x){return "⚠ "+x;}).join("<br>")+'</div>';
+  html+=sparkSVG(S.selectedId);
   if(canCalc){
     var frcIn=s.frcIn||1.0,khr=kd/24,simT=(S.simLevel*s.area)/S.simFlow,simFrc=frcIn*Math.exp(-khr*simT);
     var maxT=-Math.log(S.threshold/frcIn)/khr,maxLv=(maxT*S.simFlow)/s.area;
@@ -1110,6 +1225,7 @@ function renderInfo(){
       '<div class="slider-row"><label>ระดับน้ำ</label><input type="range" min="1" max="'+s.maxLv+'" step="0.1" value="'+S.simLevel+'" oninput="upd(\'lv\',this.value)"><div class="slider-val mono" style="color:#22d3ee">'+S.simLevel.toFixed(1)+' m</div></div>'+
       '<div class="slider-row"><label>น้ำจ่าย</label><input type="range" min="2000" max="30000" step="500" value="'+S.simFlow+'" oninput="upd(\'fl\',this.value)"><div class="slider-val mono" style="color:#60a5fa">'+S.simFlow.toLocaleString()+' m³/h</div></div>'+
       '<div class="slider-row"><label>เกณฑ์ FRC</label><input type="range" min="0.2" max="1.5" step="0.05" value="'+S.threshold+'" oninput="upd(\'th\',this.value)"><div class="slider-val mono" style="color:#fbbf24">'+S.threshold.toFixed(2)+' mg/L</div></div>'+
+      '<label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#8aa3bd;padding:5px 0 1px;cursor:pointer"><input type="checkbox" style="accent-color:#34d399;width:14px;height:14px" '+(S.liveK?"checked":"")+' onchange="S.liveK=this.checked;renderInfo()"> ใช้ k สดในการคำนวณ '+(kLive>0?'<span class="mono" style="color:#34d399">('+kLive.toFixed(2)+'/day)</span>':'<span style="color:#48596e">(ยังคำนวณไม่ได้ขณะนี้)</span>')+'</label>'+
     '</div>'+
     '<div class="result-row"><div class="result-box"><div class="rl">Retention</div><div class="rv mono" style="color:#60a5fa">'+simT.toFixed(1)+'</div><div class="ru">hr</div></div><div class="result-box"><div class="rl">FRC คาดการณ์</div><div class="rv mono" style="color:'+(simFrc>=S.threshold?"#34d399":"#f87171")+'">'+simFrc.toFixed(3)+'</div><div class="ru">mg/L</div></div></div>'+
     '<div class="result-row"><div class="result-box"><div class="rl">ระดับสูงสุดปลอดภัย</div><div class="rv mono" style="color:#fbbf24">'+maxLv.toFixed(1)+'</div><div class="ru">m (FRC≥'+S.threshold+')</div></div><div class="result-box"><div class="rl">Booster ต้องเติม</div><div class="rv mono" style="color:'+(booster>0?"#f87171":"#34d399")+'">'+(booster>0?booster.toFixed(3):"0")+'</div><div class="ru">mg/L</div></div></div>'+
